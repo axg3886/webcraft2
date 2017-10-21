@@ -1,0 +1,40 @@
+body {
+	background-color: #000000;
+	color: #ffffff;
+	width: 95%;
+}
+
+button {
+	background-color: #474747;
+	color: #ffffff;
+	border: 0;
+	padding: 3px 8px;
+}
+
+.overflow {
+	height: auto;
+	max-height: 805px;
+
+	max-width: 805px;
+	overflow-x: auto;
+	overflow-y: auto;
+	width: auto;
+}
+
+.responsive {
+	float: left;
+	position: relative;
+}
+
+#canvasContainer
+{
+	position : relative;
+}
+
+#txCanvas
+{
+	position : absolute;
+	left : 0px;
+	top : 0px;
+	z-index : 10;
+}
