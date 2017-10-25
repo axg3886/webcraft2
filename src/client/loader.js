@@ -15,11 +15,3 @@ window.onload = () => {
   app.main.audio = app.audio;
   app.main.init();
 };
-
-window.onblur = () => {
-  app.main.pauseGame();
-};
-
-window.onfocus = () => {
-  app.main.resumeGame();
-};

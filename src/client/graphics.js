@@ -1,10 +1,11 @@
-var app = app || {};
+const app = window.app || {};
 
-// Function constructors as alternatives to make* functions - see actual create* function for documentation
+// Function constructors as alternatives to make* functions
+// see actual create* function for documentation
 let MeshRenderable = null;
 let ParticleRenderable = null;
 let Particle = null;
-const PointLight = null;
+let PointLight = null;
 let DirectionalLight = null;
 let PerspectiveCamera = null;
 let OrthogonalCamera = null;
@@ -458,6 +459,33 @@ app.graphics = (function () {
       camPos: gl.getUniformLocation(directionalShader, 'camPos'),
     };
 
+    // Point light fragment shader
+    const pointSource = app.shaders.lightPoint;
+    const point = gl.createShader(gl.FRAGMENT_SHADER);
+    gl.shaderSource(point, pointSource);
+    gl.compileShader(point);
+    const pointShader = gl.createProgram();
+    gl.attachShader(pointShader, vShader);
+    gl.attachShader(pointShader, point);
+    gl.linkProgram(pointShader);
+
+    gl.useProgram(pointShader);
+    shaders.lightPoint =
+    {
+      shader: pointShader,
+      vpos: gl.getAttribLocation(pointShader, 'vpos'),
+      diffuse: gl.getUniformLocation(pointShader, 'diffuse'),
+      normal: gl.getUniformLocation(pointShader, 'normal'),
+      specular: gl.getUniformLocation(pointShader, 'specular'),
+      position: gl.getUniformLocation(pointShader, 'position'),
+      lightPos: gl.getUniformLocation(pointShader, 'lightPos'),
+      intensity: gl.getUniformLocation(pointShader, 'intensity'),
+      camPos: gl.getUniformLocation(pointShader, 'camPos'),
+      radius: gl.getUniformLocation(pointShader, 'radius'),
+    };
+
+    console.log(`compilation error : ${gl.getShaderInfoLog(point)}`);
+
 		// Fusion pass fragment shader
     const fusionSource = app.shaders.fusionFS;
     const fusion = gl.createShader(gl.FRAGMENT_SHADER);
@@ -607,8 +635,9 @@ app.graphics = (function () {
   function drawMesh(renderable)	{
     gl.bindBuffer(gl.ARRAY_BUFFER, meshes[renderable.mesh].buffer);
     const v = meshes[renderable.mesh].count;
+    const shader = shaders[renderable.material.shader];
 
-    gl.useProgram(shaders[renderable.material.shader].shader);
+    gl.useProgram(shader.shader);
 
     if (lastDrawnRenderable)		{
       gl.disableVertexAttribArray(shaders[lastDrawnRenderable.material.shader].vpos);
@@ -616,14 +645,14 @@ app.graphics = (function () {
       gl.disableVertexAttribArray(shaders[lastDrawnRenderable.material.shader].vnor);
     }
 
-    gl.enableVertexAttribArray(shaders[renderable.material.shader].vpos);
-    gl.enableVertexAttribArray(shaders[renderable.material.shader].vtex);
-    gl.enableVertexAttribArray(shaders[renderable.material.shader].vnor);
+    gl.enableVertexAttribArray(shader.vpos);
+    gl.enableVertexAttribArray(shader.vtex);
+    gl.enableVertexAttribArray(shader.vnor);
 
 		// Set the attribute values
-    gl.vertexAttribPointer(shaders[renderable.material.shader].vpos, 3, gl.FLOAT, false, 0, 0);
-    gl.vertexAttribPointer(shaders[renderable.material.shader].vtex, 2, gl.FLOAT, false, 0, v * 12);
-    gl.vertexAttribPointer(shaders[renderable.material.shader].vnor, 3, gl.FLOAT, false, 0, v * 20);
+    gl.vertexAttribPointer(shader.vpos, 3, gl.FLOAT, false, 0, 0);
+    gl.vertexAttribPointer(shader.vtex, 2, gl.FLOAT, false, 0, v * 12);
+    gl.vertexAttribPointer(shader.vnor, 3, gl.FLOAT, false, 0, v * 20);
 
     const pmat = cameraMatrix;
     let wmat = fastMatrix;
@@ -640,10 +669,14 @@ app.graphics = (function () {
     }
 
 		// Set the matrix uniforms
-    gl.uniformMatrix4fv(shaders[renderable.material.shader].puni, false, pmat);
-    gl.uniformMatrix4fv(shaders[renderable.material.shader].wuni, false, wmat);
+    gl.uniformMatrix4fv(shader.puni, false, pmat);
+    gl.uniformMatrix4fv(shader.wuni, false, wmat);
 
-    gl.uniform4f(gl.getUniformLocation(shaders[renderable.material.shader].shader, 'camPos'), activeCamera.transform.position.elements[0], activeCamera.transform.position.elements[1], activeCamera.transform.position.elements[2], activeCamera.transform.position.elements[3]);
+    gl.uniform4f(gl.getUniformLocation(shader.shader, 'camPos'),
+      activeCamera.transform.position.elements[0],
+      activeCamera.transform.position.elements[1],
+      activeCamera.transform.position.elements[2],
+      activeCamera.transform.position.elements[3]);
 
 		// Texture
 
@@ -660,7 +693,11 @@ app.graphics = (function () {
 		// Set vector uniforms
     for (let i = 0; i < renderable.material.vectors.length; ++i)		{
       if (renderable.material.vectors[i].uni)			{
-        gl.uniform4f(renderable.material.vectors[i].uni, renderable.material.vectors[i].val.elements[0], renderable.material.vectors[i].val.elements[1], renderable.material.vectors[i].val.elements[2], renderable.material.vectors[i].val.elements[3]);
+        gl.uniform4f(renderable.material.vectors[i].uni,
+          renderable.material.vectors[i].val.elements[0],
+          renderable.material.vectors[i].val.elements[1],
+          renderable.material.vectors[i].val.elements[2],
+          renderable.material.vectors[i].val.elements[3]);
       }
     }
 
@@ -705,7 +742,9 @@ app.graphics = (function () {
     gl.uniformMatrix4fv(shaders.particle.cam, false, camTransform);
     gl.uniformMatrix4fv(shaders.particle.persp, false, perspMatrix);
 
-    gl.uniform3f(shaders.particle.camPos, activeCamera.transform.position.elements[0], activeCamera.transform.position.elements[1], activeCamera.transform.position.elements[2]);
+    gl.uniform3f(shaders.particle.camPos,
+      activeCamera.transform.position.elements[0],
+      activeCamera.transform.position.elements[1], activeCamera.transform.position.elements[2]);
 
     gl.uniform2f(shaders.particle.screenSize, glCanvas.width, glCanvas.height);
 
@@ -783,6 +822,34 @@ app.graphics = (function () {
       gl.uniform4f(shaders.lightDirectional.intensity, directionalLights[i].intensity.elements[0] || 0.5, directionalLights[i].intensity.elements[1] || 0.5, directionalLights[i].intensity.elements[2] || 0.5, 1.0);
 
       gl.uniform4f(shaders.lightDirectional.camPos, activeCamera.transform.position.elements[0] || 0.0, activeCamera.transform.position.elements[1] || 0.0, activeCamera.transform.position.elements[2] || 0.0, 1.0);
+
+      gl.drawArrays(gl.TRIANGLES, 0, 6);
+    }
+
+    // POINT
+
+    gl.useProgram(shaders.lightPoint.shader);
+    gl.activeTexture(gl.TEXTURE0);
+    gl.bindTexture(gl.TEXTURE_2D, framebuffer.textures.diffuse);
+    gl.uniform1i(shaders.lightPoint.diffuse, 0);
+    gl.activeTexture(gl.TEXTURE1);
+    gl.bindTexture(gl.TEXTURE_2D, framebuffer.textures.normal);
+    gl.uniform1i(shaders.lightPoint.normal, 1);
+    gl.activeTexture(gl.TEXTURE2);
+    gl.bindTexture(gl.TEXTURE_2D, framebuffer.textures.specular);
+    gl.uniform1i(shaders.lightPoint.specular, 2);
+    gl.activeTexture(gl.TEXTURE3);
+    gl.bindTexture(gl.TEXTURE_2D, framebuffer.textures.position);
+    gl.uniform1i(shaders.lightPoint.position, 3);
+
+    for (let i = 0; i < pointLights.length; ++i) {
+      gl.uniform4f(shaders.lightPoint.lightPos, pointLights[i].position.elements[0] || 0.0, pointLights[i].position.elements[1] || 0.0, pointLights[i].position.elements[2] || 0.0, 1.0);
+
+      gl.uniform4f(shaders.lightPoint.intensity, pointLights[i].intensity.elements[0] || 0.5, pointLights[i].intensity.elements[1] || 0.5, pointLights[i].intensity.elements[2] || 0.5, 1.0);
+
+      gl.uniform4f(shaders.lightPoint.camPos, activeCamera.transform.position.elements[0] || 0.0, activeCamera.transform.position.elements[1] || 0.0, activeCamera.transform.position.elements[2] || 0.0, 1.0);
+
+      gl.uniform1f(shaders.lightPoint.radius, pointLights[i].radius);
 
       gl.drawArrays(gl.TRIANGLES, 0, 6);
     }
@@ -1260,10 +1327,29 @@ app.graphics = (function () {
     this.time = 0.0;
   };
 
-	// TODO : Implement, etc.
-  function createPointLight()	{
-    return null;
+  // Returns an object representing a light to be rendered by the rendering engine
+  // After creation, the position, intensity, and radius can be freely modified as properties
+  //
+  // @param { object } descriptor - optional keys to initialize the light
+  /*
+    * position : A Vector (unit) representing the position of the light
+    * intensity : A Vector representing the color of the light
+    * radius : A float representing the effective radius of the light
+  */
+  function createPointLight(descriptor) {
+    return new PointLight(descriptor);
   }
+  PointLight = function (descriptor) {
+    this.position = descriptor.position || $V([0.0, 0.0, 0.0]);
+    this.intensity = descriptor.intensity || $V([0.5, 0.5, 0.5]);
+    this.radius = descriptor.radius || 10.0;
+
+    this.register = function () { registerLight(this); };
+    this.unregister = function () { unregisterLight(this); };
+
+    this.ltype = 'point';
+    this.lindex = -1;
+  };
 
 	// Returns an object representing a light to be rendered by the rendering engine
 	// After creation, the direction and intensity can be freely modified as properties
@@ -1329,6 +1415,8 @@ app.graphics = (function () {
         directionalLights.push(light);
         break;
       case 'point' :
+        light.lindex = pointLights.length;
+        pointLights.push(light);
         break;
     }
   }
@@ -1344,6 +1432,8 @@ app.graphics = (function () {
         light.lindex = -1;
         break;
       case 'point' :
+        pointLights[light.lindex] = pointLights.pop();
+        light.lindex = -1;
         break;
     }
   }

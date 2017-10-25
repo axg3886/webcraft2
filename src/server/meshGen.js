@@ -73,6 +73,7 @@ function generateChunkMesh(chunk, type) {
   let faces = 0;
 
   // I can't believe I'm reverse-engineering my own rendering engine
+  // EDIT: Haha, not true anymore!
   for (let i = 0; i < worldGen.CHUNK_HEIGHT *
             worldGen.CHUNK_SIZE *
             worldGen.CHUNK_SIZE; ++i) {

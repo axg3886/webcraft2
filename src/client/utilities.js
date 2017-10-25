@@ -96,3 +96,6 @@ window.requestFullscreen = (element) => {
   }
 	// .. and do nothing if the method is not supported
 };
+
+  // Thanks Cody-sempai!
+window.lerp = (v0, v1, alpha) => (1 - alpha) * v0 + alpha * v1;

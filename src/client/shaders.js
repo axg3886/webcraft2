@@ -176,6 +176,51 @@ void main(void)
 }
 `;
 
+	let lightPoint = `
+precision mediump float;
+
+uniform sampler2D diffuse;
+uniform sampler2D normal;
+uniform sampler2D specular;
+uniform sampler2D position;
+
+uniform vec4 lightPos;
+uniform vec4 intensity;
+uniform vec4 camPos;
+uniform float radius;
+
+varying vec2 uv;
+
+void main(void)
+{
+	vec3 fragPos = texture2D(position, uv).rgb;
+
+	float dist = length(fragPos - vec3(lightPos));
+	float power = max(1.0 - (dist / radius), 0.0);
+
+	vec3 direction = normalize(fragPos - vec3(lightPos));
+	vec3 opDir = -vec3(direction);
+
+	vec4 dtex = texture2D(diffuse, uv);
+
+	// DIFFUSE
+
+	vec3 normTex = texture2D(normal, uv).rgb;
+	float diff = max(dot(normTex, opDir), 0.0);
+	vec3 diffuseIntensity = (intensity * diff).rgb * dtex.rgb;
+
+	// SPECULAR
+
+	vec3 viewDir = normalize(vec3(camPos) - fragPos);
+	vec3 reflectDir = reflect(vec3(direction), normTex);
+	vec4 specTex = texture2D(specular, uv);
+	float spec = pow(max(dot(viewDir, reflectDir), 0.0), 2.0 / max(specTex.a * specTex.a, 0.01));
+	vec3 specularIntensity = (intensity.rgb * spec) * specTex.rgb;
+
+	gl_FragData[0] = vec4((diffuseIntensity + specularIntensity) * power, dtex.a);
+}
+`;
+
 	// Renders particles
   const particleVS = `
 attribute vec3 vpos;
@@ -297,6 +342,7 @@ void main(void)
     lightPrepass,
     lightAmbient,
     lightDirectional,
+    lightPoint,
 
     particleVS,
     particleFS,
