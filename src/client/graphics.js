@@ -1,5 +1,3 @@
-
-
 var app = app || {};
 
 // Function constructors as alternatives to make* functions - see actual create* function for documentation
@@ -1496,41 +1494,59 @@ app.graphics = (function () {
           const f2 = chunks[2].split('/');
           const f3 = chunks[3].split('/');
 
-          faces.push(parseInt(f1[0] - 1, 10));
-          faces.push(parseInt(f1[1] - 1, 10));
-          faces.push(parseInt(f1[2] - 1, 10));
-          faces.push(parseInt(f2[0] - 1, 10));
-          faces.push(parseInt(f2[1] - 1, 10));
-          faces.push(parseInt(f2[2] - 1, 10));
-          faces.push(parseInt(f3[0] - 1, 10));
-          faces.push(parseInt(f3[1] - 1, 10));
-          faces.push(parseInt(f3[2] - 1, 10));
+          faces.push(parseInt(f1[0], 10));
+          faces.push(parseInt(f1[1], 10));
+          faces.push(parseInt(f1[2], 10));
+          faces.push(parseInt(f2[0], 10));
+          faces.push(parseInt(f2[1], 10));
+          faces.push(parseInt(f2[2], 10));
+          faces.push(parseInt(f3[0], 10));
+          faces.push(parseInt(f3[1], 10));
+          faces.push(parseInt(f3[2], 10));
 
           break;
       }
     }
+    createMesh({ vp, vt, vn, faces }, name);
+  }
 
-    const dataBuffer = [];
-    let glBuffer = null;
+  function createMesh(meshData, name) {
+    const vp = meshData.vp;
+    const vt = meshData.vt;
+    const vn = meshData.vn;
+    const faces = meshData.faces;
+
+    // Subtract one from all faces because reasons
+    for (let i = 0; i < faces.length; i++) {
+      faces[i] -= 1;
+    }
+
+    const dataBuffer = new Float32Array(faces.length * 8);
+    const vpStart = 0;
+    const vtStart = vpStart + faces.length * 3;
+    const vnStart = vtStart + faces.length * 2;
+
+    let face = null;
 
 		// Boy howdy, look at them numbers
 		// We got some real number crunchin' goin' on right here, we do
     for (let i = 0; i < faces.length; ++i)		{
-      dataBuffer.push(vp[faces[i * 3 + 0] * 3 + 0]);
-      dataBuffer.push(vp[faces[i * 3 + 0] * 3 + 1]);
-      dataBuffer.push(vp[faces[i * 3 + 0] * 3 + 2]);
-    }
-    for (let i = 0; i < faces.length; ++i)		{
-      dataBuffer.push(vt[faces[i * 3 + 1] * 2 + 0]);
-      dataBuffer.push(vt[faces[i * 3 + 1] * 2 + 1]);
-    }
-    for (let i = 0; i < faces.length; ++i)		{
-      dataBuffer.push(vn[faces[i * 3 + 2] * 3 + 0]);
-      dataBuffer.push(vn[faces[i * 3 + 2] * 3 + 1]);
-      dataBuffer.push(vn[faces[i * 3 + 2] * 3 + 2]);
+      face = faces[i * 3 + 0];
+      dataBuffer[i * 3 + 0 + vpStart] = (vp[face * 3 + 0]);
+      dataBuffer[i * 3 + 1 + vpStart] = (vp[face * 3 + 1]);
+      dataBuffer[i * 3 + 2 + vpStart] = (vp[face * 3 + 2]);
+
+      face = faces[i * 3 + 1];
+      dataBuffer[i * 2 + 0 + vtStart] = (vt[face * 2 + 0]);
+      dataBuffer[i * 2 + 1 + vtStart] = (vt[face * 2 + 1]);
+
+      face = faces[i * 3 + 2];
+      dataBuffer[i * 3 + 0 + vnStart] = (vn[face * 3 + 0]);
+      dataBuffer[i * 3 + 1 + vnStart] = (vn[face * 3 + 1]);
+      dataBuffer[i * 3 + 2 + vnStart] = (vn[face * 3 + 2]);
     }
 
-    glBuffer = gl.createBuffer();
+    const glBuffer = gl.createBuffer();
     gl.bindBuffer(gl.ARRAY_BUFFER, glBuffer);
     gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(dataBuffer), gl.STATIC_DRAW);
 
@@ -1731,6 +1747,7 @@ app.graphics = (function () {
 
     loadMesh,
     initMesh,
+    createMesh,
     loadTexture,
     initTexture,
     loadMaterial,

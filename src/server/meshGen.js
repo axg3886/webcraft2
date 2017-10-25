@@ -14,11 +14,17 @@ const isBlockSolid = (b, type) => worldGen.TYPE_CUBE[b] &&
   (type === 1 ? worldGen.TYPE_OPAQUE[b] : !(worldGen.TYPE_OPAQUE[b]));
 
 // Optimization trick - _only do this once_, since it never changes.
-const standardMeshData = ((() => {
-  // Vertex tex-coords - map into a mega-texture
-  const meshVt = [];
-  // Vertex normals - there are really only six of these (because cube)
-  const meshVn = [];
+const standardMeshData = () => {
+  const meshObj = {
+    // Vertex positions - the only one that actually needs to be built
+    vp: [],
+    // Vertex normals - there are really only six of these (because cube)
+    vn: [],
+    // Vertex tex-coords - map into a mega-texture
+    vt: [],
+    // Faces - this one gets a little more interesting I suppose
+    faces: [],
+  };
 
   // This will fill out the mega-texture, which allows for 32 different textures
   for (let i = 0; i < 32; ++i) {
@@ -28,45 +34,40 @@ const standardMeshData = ((() => {
 
     const s = 0.25;
 
-    meshVt.push((`vt ${0.00 * s + x} ${0.50 * s + y} \n`));
-    meshVt.push((`vt ${0.25 * s + x} ${0.50 * s + y} \n`));
-    meshVt.push((`vt ${0.50 * s + x} ${0.50 * s + y} \n`));
+    meshObj.vt.push(0.00 * s + x); meshObj.vt.push(0.50 * s + y);
+    meshObj.vt.push(0.25 * s + x); meshObj.vt.push(0.50 * s + y);
+    meshObj.vt.push(0.50 * s + x); meshObj.vt.push(0.50 * s + y);
 
-    meshVt.push((`vt ${0.00 * s + x} ${0.25 * s + y} \n`));
-    meshVt.push((`vt ${0.25 * s + x} ${0.25 * s + y} \n`));
-    meshVt.push((`vt ${0.50 * s + x} ${0.25 * s + y} \n`));
-    meshVt.push((`vt ${0.75 * s + x} ${0.25 * s + y} \n`));
-    meshVt.push((`vt ${1.00 * s + x} ${0.25 * s + y} \n`));
+    meshObj.vt.push(0.00 * s + x); meshObj.vt.push(0.25 * s + y);
+    meshObj.vt.push(0.25 * s + x); meshObj.vt.push(0.25 * s + y);
+    meshObj.vt.push(0.50 * s + x); meshObj.vt.push(0.25 * s + y);
+    meshObj.vt.push(0.75 * s + x); meshObj.vt.push(0.25 * s + y);
+    meshObj.vt.push(1.00 * s + x); meshObj.vt.push(0.25 * s + y);
 
-    meshVt.push((`vt ${0.00 * s + x} ${0.00 * s + y} \n`));
-    meshVt.push((`vt ${0.25 * s + x} ${0.00 * s + y} \n`));
-    meshVt.push((`vt ${0.50 * s + x} ${0.00 * s + y} \n`));
-    meshVt.push((`vt ${0.75 * s + x} ${0.00 * s + y} \n`));
-    meshVt.push((`vt ${1.00 * s + x} ${0.00 * s + y} \n`));
+    meshObj.vt.push(0.00 * s + x); meshObj.vt.push(0.00 * s + y);
+    meshObj.vt.push(0.25 * s + x); meshObj.vt.push(0.00 * s + y);
+    meshObj.vt.push(0.50 * s + x); meshObj.vt.push(0.00 * s + y);
+    meshObj.vt.push(0.75 * s + x); meshObj.vt.push(0.00 * s + y);
+    meshObj.vt.push(1.00 * s + x); meshObj.vt.push(0.00 * s + y);
   }
 
-  meshVn.push((`vn ${0} ${0} ${1}\n`));
-  meshVn.push((`vn ${0} ${0} ${-1}\n`));
-  meshVn.push((`vn ${0} ${1} ${0}\n`));
-  meshVn.push((`vn ${0} ${-1} ${0}\n`));
-  meshVn.push((`vn ${1} ${0} ${0}\n`));
-  meshVn.push((`vn ${-1} ${0} ${0}\n`));
+  meshObj.vn.push(0); meshObj.vn.push(0); meshObj.vn.push(1);
+  meshObj.vn.push(0); meshObj.vn.push(0); meshObj.vn.push(-1);
+  meshObj.vn.push(0); meshObj.vn.push(1); meshObj.vn.push(0);
+  meshObj.vn.push(0); meshObj.vn.push(-1); meshObj.vn.push(0);
+  meshObj.vn.push(1); meshObj.vn.push(0); meshObj.vn.push(0);
+  meshObj.vn.push(-1); meshObj.vn.push(0); meshObj.vn.push(0);
 
-  const meshVtS = meshVt.reduce((a, b) => a + b, '');
-  const meshVnS = meshVn.reduce((a, b) => a + b, '');
-
-  return meshVtS + meshVnS;
-})());
+  return meshObj;
+};
 
 // Generates a string that the rendering engine can convert into a mesh on the GPU
 // Route the return of this straight into initMesh in graphics
 // @param { array? } ochunk - you should probably send it a chunk
 // @param { 1 = transparent } type - what chunk type are we building
 function generateChunkMesh(chunk, type) {
-  // Vertex positions - the only one that actually needs to be built
-  const meshV = [];
-  // Faces - this one gets a little more interesting I suppose
-  const meshF = [];
+  // A modifiable copy of the standard mesh data
+  const meshData = standardMeshData();
 
   // Number of faces created thus far
   let faces = 0;
@@ -100,14 +101,18 @@ function generateChunkMesh(chunk, type) {
 
     // Left - side note : I love short-circuit evaluation
     if (x === 0 || !(isBlockSolid(chunk.get(x - 1, y, z), type))) {
-      meshV.push((`v ${bX} ${bY} ${aZ}\n`));
-      meshV.push((`v ${bX} ${aY} ${bZ}\n`));
-      meshV.push((`v ${bX} ${bY} ${bZ}\n`));
-      meshV.push((`v ${bX} ${aY} ${aZ}\n`));
+      meshData.vp.push(bX); meshData.vp.push(bY); meshData.vp.push(aZ);
+      meshData.vp.push(bX); meshData.vp.push(aY); meshData.vp.push(bZ);
+      meshData.vp.push(bX); meshData.vp.push(bY); meshData.vp.push(bZ);
+      meshData.vp.push(bX); meshData.vp.push(aY); meshData.vp.push(aZ);
 
-      meshF.push(`f ${f + 0}/${b + 9}/${6} ${f + 1}/${b + 3}/${6} ${f + 2}/${b + 8}/${6}\n`);
+      meshData.faces.push(f + 0); meshData.faces.push(b + 9); meshData.faces.push(6);
+      meshData.faces.push(f + 1); meshData.faces.push(b + 3); meshData.faces.push(6);
+      meshData.faces.push(f + 2); meshData.faces.push(b + 8); meshData.faces.push(6);
 
-      meshF.push(`f ${f + 0}/${b + 9}/${6} ${f + 3}/${b + 4}/${6} ${f + 1}/${b + 3}/${6}\n`);
+      meshData.faces.push(f + 0); meshData.faces.push(b + 9); meshData.faces.push(6);
+      meshData.faces.push(f + 3); meshData.faces.push(b + 4); meshData.faces.push(6);
+      meshData.faces.push(f + 1); meshData.faces.push(b + 3); meshData.faces.push(6);
 
       faces += 1;
       f = faces * 4 + 1;
@@ -115,14 +120,18 @@ function generateChunkMesh(chunk, type) {
 
     // Right
     if (x === worldGen.CHUNK_SIZE - 1 || !(isBlockSolid(chunk.get(x + 1, y, z), type))) {
-      meshV.push((`v ${aX} ${bY} ${bZ}\n`));
-      meshV.push((`v ${aX} ${aY} ${aZ}\n`));
-      meshV.push((`v ${aX} ${bY} ${aZ}\n`));
-      meshV.push((`v ${aX} ${aY} ${bZ}\n`));
+      meshData.vp.push(aX); meshData.vp.push(bY); meshData.vp.push(bZ);
+      meshData.vp.push(aX); meshData.vp.push(aY); meshData.vp.push(aZ);
+      meshData.vp.push(aX); meshData.vp.push(bY); meshData.vp.push(aZ);
+      meshData.vp.push(aX); meshData.vp.push(aY); meshData.vp.push(bZ);
 
-      meshF.push(`f ${f + 0}/${b + 11}/${5} ${f + 1}/${b + 5}/${5} ${f + 2}/${b + 10}/${5}\n`);
+      meshData.faces.push(f + 0); meshData.faces.push(b + 11); meshData.faces.push(5);
+      meshData.faces.push(f + 1); meshData.faces.push(b + 5); meshData.faces.push(5);
+      meshData.faces.push(f + 2); meshData.faces.push(b + 10); meshData.faces.push(5);
 
-      meshF.push(`f ${f + 0}/${b + 11}/${5} ${f + 3}/${b + 6}/${5} ${f + 1}/${b + 5}/${5}\n`);
+      meshData.faces.push(f + 0); meshData.faces.push(b + 11); meshData.faces.push(5);
+      meshData.faces.push(f + 3); meshData.faces.push(b + 6); meshData.faces.push(5);
+      meshData.faces.push(f + 1); meshData.faces.push(b + 5); meshData.faces.push(5);
 
       faces += 1;
       f = faces * 4 + 1;
@@ -130,14 +139,18 @@ function generateChunkMesh(chunk, type) {
 
     // Front
     if (z === worldGen.CHUNK_SIZE - 1 || !(isBlockSolid(chunk.get(x, y, z + 1), type))) {
-      meshV.push((`v ${aX} ${bY} ${aZ}\n`));
-      meshV.push((`v ${bX} ${aY} ${aZ}\n`));
-      meshV.push((`v ${bX} ${bY} ${aZ}\n`));
-      meshV.push((`v ${aX} ${aY} ${aZ}\n`));
+      meshData.vp.push(aX); meshData.vp.push(bY); meshData.vp.push(aZ);
+      meshData.vp.push(bX); meshData.vp.push(aY); meshData.vp.push(aZ);
+      meshData.vp.push(bX); meshData.vp.push(bY); meshData.vp.push(aZ);
+      meshData.vp.push(aX); meshData.vp.push(aY); meshData.vp.push(aZ);
 
-      meshF.push(`f ${f + 0}/${b + 10}/${1} ${f + 1}/${b + 4}/${1} ${f + 2}/${b + 9}/${1}\n`);
+      meshData.faces.push(f + 0); meshData.faces.push(b + 10); meshData.faces.push(1);
+      meshData.faces.push(f + 1); meshData.faces.push(b + 4); meshData.faces.push(1);
+      meshData.faces.push(f + 2); meshData.faces.push(b + 9); meshData.faces.push(1);
 
-      meshF.push(`f ${f + 0}/${b + 10}/${1} ${f + 3}/${b + 5}/${1} ${f + 1}/${b + 4}/${1}\n`);
+      meshData.faces.push(f + 0); meshData.faces.push(b + 10); meshData.faces.push(1);
+      meshData.faces.push(f + 3); meshData.faces.push(b + 5); meshData.faces.push(1);
+      meshData.faces.push(f + 1); meshData.faces.push(b + 4); meshData.faces.push(1);
 
       faces += 1;
       f = faces * 4 + 1;
@@ -145,14 +158,18 @@ function generateChunkMesh(chunk, type) {
 
     // Back
     if (z === 0 || !(isBlockSolid(chunk.get(x, y, z - 1), type))) {
-      meshV.push((`v ${bX} ${bY} ${bZ}\n`));
-      meshV.push((`v ${aX} ${aY} ${bZ}\n`));
-      meshV.push((`v ${aX} ${bY} ${bZ}\n`));
-      meshV.push((`v ${bX} ${aY} ${bZ}\n`));
+      meshData.vp.push(bX); meshData.vp.push(bY); meshData.vp.push(bZ);
+      meshData.vp.push(aX); meshData.vp.push(aY); meshData.vp.push(bZ);
+      meshData.vp.push(aX); meshData.vp.push(bY); meshData.vp.push(bZ);
+      meshData.vp.push(bX); meshData.vp.push(aY); meshData.vp.push(bZ);
 
-      meshF.push(`f ${f + 0}/${b + 12}/${2} ${f + 1}/${b + 6}/${2} ${f + 2}/${b + 11}/${2}\n`);
+      meshData.faces.push(f + 0); meshData.faces.push(b + 12); meshData.faces.push(2);
+      meshData.faces.push(f + 1); meshData.faces.push(b + 6); meshData.faces.push(2);
+      meshData.faces.push(f + 2); meshData.faces.push(b + 11); meshData.faces.push(2);
 
-      meshF.push(`f ${f + 0}/${b + 12}/${2} ${f + 3}/${b + 7}/${2} ${f + 1}/${b + 6}/${2}\n`);
+      meshData.faces.push(f + 0); meshData.faces.push(b + 12); meshData.faces.push(2);
+      meshData.faces.push(f + 3); meshData.faces.push(b + 7); meshData.faces.push(2);
+      meshData.faces.push(f + 1); meshData.faces.push(b + 6); meshData.faces.push(2);
 
       faces += 1;
       f = faces * 4 + 1;
@@ -160,14 +177,18 @@ function generateChunkMesh(chunk, type) {
 
     // Top
     if (y === worldGen.CHUNK_HEIGHT - 1 || !(isBlockSolid(chunk.get(x, y + 1, z), type))) {
-      meshV.push((`v ${aX} ${aY} ${aZ}\n`));
-      meshV.push((`v ${bX} ${aY} ${bZ}\n`));
-      meshV.push((`v ${bX} ${aY} ${aZ}\n`));
-      meshV.push((`v ${aX} ${aY} ${bZ}\n`));
+      meshData.vp.push(aX); meshData.vp.push(aY); meshData.vp.push(aZ);
+      meshData.vp.push(bX); meshData.vp.push(aY); meshData.vp.push(bZ);
+      meshData.vp.push(bX); meshData.vp.push(aY); meshData.vp.push(aZ);
+      meshData.vp.push(aX); meshData.vp.push(aY); meshData.vp.push(bZ);
 
-      meshF.push(`f ${f + 0}/${b + 5}/${3} ${f + 1}/${b + 1}/${3} ${f + 2}/${b + 4}/${3}\n`);
+      meshData.faces.push(f + 0); meshData.faces.push(b + 5); meshData.faces.push(3);
+      meshData.faces.push(f + 1); meshData.faces.push(b + 1); meshData.faces.push(3);
+      meshData.faces.push(f + 2); meshData.faces.push(b + 4); meshData.faces.push(3);
 
-      meshF.push(`f ${f + 0}/${b + 5}/${3} ${f + 3}/${b + 2}/${3} ${f + 1}/${b + 1}/${3}\n`);
+      meshData.faces.push(f + 0); meshData.faces.push(b + 5); meshData.faces.push(3);
+      meshData.faces.push(f + 3); meshData.faces.push(b + 2); meshData.faces.push(3);
+      meshData.faces.push(f + 1); meshData.faces.push(b + 1); meshData.faces.push(3);
 
       faces += 1;
       f = faces * 4 + 1;
@@ -175,24 +196,24 @@ function generateChunkMesh(chunk, type) {
 
     // Bottom
     if (y === 0 || !(isBlockSolid(chunk.get(x, y - 1, z), type))) {
-      meshV.push((`v ${bX} ${bY} ${aZ}\n`));
-      meshV.push((`v ${aX} ${bY} ${bZ}\n`));
-      meshV.push((`v ${aX} ${bY} ${aZ}\n`));
-      meshV.push((`v ${bX} ${bY} ${bZ}\n`));
+      meshData.vp.push(bX); meshData.vp.push(bY); meshData.vp.push(aZ);
+      meshData.vp.push(aX); meshData.vp.push(bY); meshData.vp.push(bZ);
+      meshData.vp.push(aX); meshData.vp.push(bY); meshData.vp.push(aZ);
+      meshData.vp.push(bX); meshData.vp.push(bY); meshData.vp.push(bZ);
 
-      meshF.push(`f ${f + 0}/${b + 3}/${4} ${f + 1}/${b + 1}/${4} ${f + 2}/${b + 4}/${4}\n`);
+      meshData.faces.push(f + 0); meshData.faces.push(b + 3); meshData.faces.push(4);
+      meshData.faces.push(f + 1); meshData.faces.push(b + 1); meshData.faces.push(4);
+      meshData.faces.push(f + 2); meshData.faces.push(b + 4); meshData.faces.push(4);
 
-      meshF.push(`f ${f + 0}/${b + 3}/${4} ${f + 3}/${b + 0}/${4} ${f + 1}/${b + 1}/${4}\n`);
+      meshData.faces.push(f + 0); meshData.faces.push(b + 3); meshData.faces.push(4);
+      meshData.faces.push(f + 3); meshData.faces.push(b + 0); meshData.faces.push(4);
+      meshData.faces.push(f + 1); meshData.faces.push(b + 1); meshData.faces.push(4);
 
       faces += 1;
       f = faces * 4 + 1;
     }
   }
-
-  const meshVS = meshV.reduce((a, b) => a + b, '');
-  const meshFS = meshF.reduce((a, b) => a + b, '');
-
-  return meshVS + standardMeshData + meshFS;
+  return meshData;
 }
 
 module.exports.generateChunkMesh = generateChunkMesh;

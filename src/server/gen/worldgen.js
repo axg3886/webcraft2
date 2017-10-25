@@ -83,8 +83,8 @@ const makeChunk = (i, j) => {
   const heightMap = [];
   const get = (x, y, z) => chunk[y].get(x, z);
   const set = (x, y, z, v) => { chunk[y].set(x, z, v); };
-  const globalX = x => (i << 4) + x; // eslint-disable-line no-bitwise
-  const globalZ = z => (j << 4) + z; // eslint-disable-line no-bitwise
+  const globalX = x => (i << 4) + x;
+  const globalZ = z => (j << 4) + z;
   const height = (x, z) => heightMap[(x * CHUNK_SIZE) + z];
   let k;
   let x;
@@ -125,7 +125,7 @@ const makeWorld = () => {
   const indexed = i => world[i];
   const getChunk = (i, j) => indexed((i * NUM_CHUNKS) + j);
   const setChunk = (i, j, v) => { world[(i * NUM_CHUNKS) + j] = v; };
-  const chunk = (x, z) => getChunk(x >> 4, z >> 4); // eslint-disable-line no-bitwise
+  const chunk = (x, z) => getChunk(x >> 4, z >> 4);
   const get = (x, y, z) => chunk(x, z).get(x % 16, y, z % 16);
   const set = (x, y, z, v) => { chunk(x, z).set(x % 16, y, z % 16, v); };
   const height = (x, z) => chunk(x, z).height(x % 16, z % 16);

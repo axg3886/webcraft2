@@ -1,53 +1,51 @@
 "use strict";
 
-var app = app || {};
+/* eslint-env browser */
+/* globals createjs */
 
-var AudioPlayer = null;
+var app = window.app || {};
 
-// There's not really a whole lot to do here, really this is all just syntactic sugar to make audio code look more like the rest of the codebase
-app.audio = function () {
-  var loadedSounds = {};
+app.AudioPlayer = null;
 
-  // Loads a sound to be played
-  // @param { string } src - the filepath of the sound to load
-  // @param { string } id - the id name to use to represent the sound once loaded
-  function loadSound(src, id) {
-    // Don't try to load a sound twice; probably not needed but better safe than sorry
-    if (loadedSounds[id]) {
-      return;
-    }
+var loadedSounds = {};
 
-    createjs.Sound.registerSound(src, id);
-    loadedSounds[id] = true;
+// Loads a sound to be played
+// @param { string } src - the filepath of the sound to load
+// @param { string } id - the id name to use to represent the sound once loaded
+function loadSound(src, id) {
+  // Don't try to load a sound twice; probably not needed but better safe than sorry
+  if (loadedSounds[id]) {
+    return;
   }
 
-  // Creates an AudioPlayer, used to play audio
-  // Once created, id can be changed freely to any loaded sound
-  // @param { string } id - id of the sound to play
-  AudioPlayer = function AudioPlayer(id) {
-    this.id = id;
+  createjs.Sound.registerSound(src, id);
+  loadedSounds[id] = true;
+}
 
-    this.play = function () {
-      this.sound = createjs.Sound.play(id);
-    };
+// Creates an AudioPlayer, used to play audio
+// Once created, id can be changed freely to any loaded sound
+// @param { string } id - id of the sound to play
+app.AudioPlayer = function (id) {
+  this.id = id;
 
-    this.pause = function () {
-      if (this.sound) {
-        this.sound.paused = true;
-      }
-    };
-
-    this.resume = function () {
-      if (this.sound) {
-        this.sound.paused = false;
-      }
-    };
+  this.play = function () {
+    this.sound = createjs.Sound.play(id);
   };
 
-  return {
-    loadSound: loadSound
+  this.pause = function () {
+    if (this.sound) {
+      this.sound.paused = true;
+    }
   };
-}();
+
+  this.resume = function () {
+    if (this.sound) {
+      this.sound.paused = false;
+    }
+  };
+};
+
+app.audio = { loadSound: loadSound };
 'use strict';
 
 var app = app || {};
@@ -1546,41 +1544,59 @@ app.graphics = function () {
           var f2 = chunks[2].split('/');
           var f3 = chunks[3].split('/');
 
-          faces.push(parseInt(f1[0] - 1, 10));
-          faces.push(parseInt(f1[1] - 1, 10));
-          faces.push(parseInt(f1[2] - 1, 10));
-          faces.push(parseInt(f2[0] - 1, 10));
-          faces.push(parseInt(f2[1] - 1, 10));
-          faces.push(parseInt(f2[2] - 1, 10));
-          faces.push(parseInt(f3[0] - 1, 10));
-          faces.push(parseInt(f3[1] - 1, 10));
-          faces.push(parseInt(f3[2] - 1, 10));
+          faces.push(parseInt(f1[0], 10));
+          faces.push(parseInt(f1[1], 10));
+          faces.push(parseInt(f1[2], 10));
+          faces.push(parseInt(f2[0], 10));
+          faces.push(parseInt(f2[1], 10));
+          faces.push(parseInt(f2[2], 10));
+          faces.push(parseInt(f3[0], 10));
+          faces.push(parseInt(f3[1], 10));
+          faces.push(parseInt(f3[2], 10));
 
           break;
       }
     }
+    createMesh({ vp: vp, vt: vt, vn: vn, faces: faces }, name);
+  }
 
-    var dataBuffer = [];
-    var glBuffer = null;
+  function createMesh(meshData, name) {
+    var vp = meshData.vp;
+    var vt = meshData.vt;
+    var vn = meshData.vn;
+    var faces = meshData.faces;
+
+    // Subtract one from all faces because reasons
+    for (var i = 0; i < faces.length; i++) {
+      faces[i] -= 1;
+    }
+
+    var dataBuffer = new Float32Array(faces.length * 8);
+    var vpStart = 0;
+    var vtStart = vpStart + faces.length * 3;
+    var vnStart = vtStart + faces.length * 2;
+
+    var face = null;
 
     // Boy howdy, look at them numbers
     // We got some real number crunchin' goin' on right here, we do
     for (var _i9 = 0; _i9 < faces.length; ++_i9) {
-      dataBuffer.push(vp[faces[_i9 * 3 + 0] * 3 + 0]);
-      dataBuffer.push(vp[faces[_i9 * 3 + 0] * 3 + 1]);
-      dataBuffer.push(vp[faces[_i9 * 3 + 0] * 3 + 2]);
-    }
-    for (var _i10 = 0; _i10 < faces.length; ++_i10) {
-      dataBuffer.push(vt[faces[_i10 * 3 + 1] * 2 + 0]);
-      dataBuffer.push(vt[faces[_i10 * 3 + 1] * 2 + 1]);
-    }
-    for (var _i11 = 0; _i11 < faces.length; ++_i11) {
-      dataBuffer.push(vn[faces[_i11 * 3 + 2] * 3 + 0]);
-      dataBuffer.push(vn[faces[_i11 * 3 + 2] * 3 + 1]);
-      dataBuffer.push(vn[faces[_i11 * 3 + 2] * 3 + 2]);
+      face = faces[_i9 * 3 + 0];
+      dataBuffer[_i9 * 3 + 0 + vpStart] = vp[face * 3 + 0];
+      dataBuffer[_i9 * 3 + 1 + vpStart] = vp[face * 3 + 1];
+      dataBuffer[_i9 * 3 + 2 + vpStart] = vp[face * 3 + 2];
+
+      face = faces[_i9 * 3 + 1];
+      dataBuffer[_i9 * 2 + 0 + vtStart] = vt[face * 2 + 0];
+      dataBuffer[_i9 * 2 + 1 + vtStart] = vt[face * 2 + 1];
+
+      face = faces[_i9 * 3 + 2];
+      dataBuffer[_i9 * 3 + 0 + vnStart] = vn[face * 3 + 0];
+      dataBuffer[_i9 * 3 + 1 + vnStart] = vn[face * 3 + 1];
+      dataBuffer[_i9 * 3 + 2 + vnStart] = vn[face * 3 + 2];
     }
 
-    glBuffer = gl.createBuffer();
+    var glBuffer = gl.createBuffer();
     gl.bindBuffer(gl.ARRAY_BUFFER, glBuffer);
     gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(dataBuffer), gl.STATIC_DRAW);
 
@@ -1783,6 +1799,7 @@ app.graphics = function () {
 
     loadMesh: loadMesh,
     initMesh: initMesh,
+    createMesh: createMesh,
     loadTexture: loadTexture,
     initTexture: initTexture,
     loadMaterial: loadMaterial,
@@ -1850,7 +1867,7 @@ the game will be properties of app.
 
 // if app exists use the existing copy
 // else create a new empty object literal
-var app = app || {};
+var app = window.app || {};
 
 window.onload = function () {
   app.main.myKeys = app.myKeys;
@@ -1868,63 +1885,69 @@ window.onfocus = function () {
 };
 'use strict';
 
-function _defineProperty(obj, key, value) { if (key in obj) { Object.defineProperty(obj, key, { value: value, enumerable: true, configurable: true, writable: true }); } else { obj[key] = value; } return obj; }
+/* globals io */ // Socket.io
+/* globals $V $L Vector */ // Sylvester
+/* globals DirectionalLight MeshRenderable ParticleRenderable */ // Our rendering engine
 
-/* jslint browser:true */
-/* jslint plusplus: true */
+var app = window.app || {};
 
-/* imported app */
-var app = app || {};
+app.main = app.main || {
+  // Properties
+  GAME: {
+    WIDTH: window.innerWidth - 20,
+    HEIGHT: window.innerHeight - 20
+  },
+  GAME_STATE: Object.freeze({
+    LOADING: 0,
+    BEGIN: 1,
+    DEFAULT: 2,
+    PAUSED: 3
+  }),
+  canvas: undefined,
 
-app.main = app.main || function () {
-  var _ref;
+  // Used by calculateDeltaTime()
+  lastTime: 0,
+  debug: true,
+  handleKeyPress: false,
+  animationID: 0,
+  gameState: undefined,
 
-  return _ref = {
-    // Properties
-    GAME: {
-      WIDTH: window.innerWidth - 20,
-      HEIGHT: window.innerHeight - 20
-    },
-    GAME_STATE: Object.freeze({
-      LOADING: 0,
-      BEGIN: 1,
-      DEFAULT: 2,
-      PAUSED: 3
-    }),
-    canvas: undefined,
+  // Keyboard input handling
+  myKeys: undefined,
 
-    // Used by calculateDeltaTime()
-    lastTime: 0,
-    debug: true,
-    handleKeyPress: false,
-    animationID: 0,
-    gameState: undefined,
+  // Will provide a rendering API to go through WebGL
+  graphics: undefined,
+  standardTextures: {
+    diffuseTexture: 'assets/textures/master.png',
+    specularTexture: 'assets/textures/masterSpecular.png',
+    emissionTexture: 'assets/textures/masterEmission.png'
+  },
 
-    // Keyboard input handling
-    myKeys: undefined,
+  // Audio stuff
+  audio: undefined,
+  musicPaused: false,
+  musicPlayer: null,
 
-    // Will provide a rendering API to go through WebGL
-    graphics: undefined,
-    standardTextures: { diffuseTexture: 'assets/textures/master.png', specularTexture: 'assets/textures/masterSpecular.png', emissionTexture: 'assets/textures/masterEmission.png' },
+  genWorker: undefined,
+  genMessage: '',
+  genStr: '          ',
+  genPercent: 0.0.toFixed(2),
 
-    // Audio stuff
-    audio: undefined,
-    musicPaused: false,
-    musicPlayer: null,
+  pmouse: null,
 
-    genWorker: undefined,
-    genMessage: '',
-    genStr: '          ',
-    genPercent: 0.0.toFixed(2),
+  sun: null,
+  // Time it takes to cycle through a day
+  cycleTime: 240000,
+  worldTime: 0,
 
-    pmouse: null,
+  torchParticle: null,
+  torch: null,
 
-    sun: null,
-    // Time it takes to cycle through a day
-    cycleTime: 240000,
-    worldTime: 0
+  sunRender: null,
+  moonRender: null,
 
-  }, _defineProperty(_ref, 'musicPlayer', null), _defineProperty(_ref, 'torchParticle', null), _defineProperty(_ref, 'torch', null), _defineProperty(_ref, 'sunRender', null), _defineProperty(_ref, 'moonRender', null), _defineProperty(_ref, 'init', function init() {
+  // methods
+  init: function init() {
     // Initialize properties
     this.canvas = document.querySelector('#txCanvas');
     this.canvas.onmousedown = this.doMousedown.bind(this);
@@ -1936,7 +1959,7 @@ app.main = app.main || function () {
 
     this.audio.loadSound('assets/sounds/BossaBossa.mp3', 'bossa');
 
-    this.musicPlayer = new AudioPlayer('bossa');
+    this.musicPlayer = new app.AudioPlayer('bossa');
     this.musicPlayer.time = 3.0;
 
     this.graphics.loadTexture('assets/textures/master.png');
@@ -1949,7 +1972,10 @@ app.main = app.main || function () {
     this.graphics.loadTexture('assets/textures/sun.png');
     this.graphics.loadTexture('assets/textures/moon.png');
 
-    this.sun = new DirectionalLight({ direction: $V([-1, -1, -1]).toUnitVector(), intensity: $V([0.4, 0.36, 0.32]) });
+    this.sun = new DirectionalLight({
+      direction: $V([-1, -1, -1]).toUnitVector(),
+      intensity: $V([0.4, 0.36, 0.32])
+    });
     this.sun.register();
 
     this.sunRender = new MeshRenderable({
@@ -1972,7 +1998,7 @@ app.main = app.main || function () {
     });
     this.moonRender.register();
 
-    window.onresize = function (e) {
+    window.onresize = function () {
       this.GAME.WIDTH = window.innerWidth - 20;
       this.GAME.HEIGHT = window.innerHeight - 20;
       this.graphics.resize(this.GAME.WIDTH, this.GAME.HEIGHT);
@@ -1983,21 +2009,23 @@ app.main = app.main || function () {
     this.genWorker = io.connect();
     this.genWorker.on('connect', function () {
       this.genWorker.on('genMsg', function (data) {
+        this.gameState = this.GAME_STATE.LOADING;
         this.genMessage = data.genMessage;
         this.genStr = data.genStr;
         this.genPercent = data.genPercent;
       }.bind(this));
 
       this.genWorker.on('meshData', function (data) {
+        this.gameState = this.GAME_STATE.LOADING;
         var meshData = data.meshData;
         for (var i = 0; i < meshData.str.length; i++) {
           var tex = 'chunk' + meshData.chunkIndex + '-' + i;
-          this.graphics.initMesh(meshData.str[i], tex);
+          this.graphics.createMesh(meshData.str[i], tex);
           var mesh = new MeshRenderable({
             textures: this.standardTextures,
             mesh: tex,
             posOnly: true,
-            opaque: i != 0,
+            opaque: i !== 0,
             position: $V([meshData.chunkX, 0, meshData.chunkZ])
           });
           mesh.register();
@@ -2013,12 +2041,20 @@ app.main = app.main || function () {
     this.torchParticle = new ParticleRenderable({});
     this.torchParticle.register();
 
-    this.torch = new MeshRenderable({ scale: $V([0.05, 0.4, 0.05]), rotation: $V([-0.2, 0.0, 0.2]), textures: { diffuseTexture: 'assets/textures/torchDiffuse.png', emissionTexture: 'assets/textures/torchEmission.png' } });
+    this.torch = new MeshRenderable({
+      scale: $V([0.05, 0.4, 0.05]),
+      rotation: $V([-0.2, 0.0, 0.2]),
+      textures: {
+        diffuseTexture: 'assets/textures/torchDiffuse.png',
+        emissionTexture: 'assets/textures/torchEmission.png'
+      }
+    });
     this.torch.register();
 
     // Start the game loop
     this.update();
-  }), _defineProperty(_ref, 'update', function update() {
+  },
+  update: function update() {
     this.animationID = requestAnimationFrame(this.update.bind(this));
 
     var dt = this.calculateDeltaTime();
@@ -2026,12 +2062,14 @@ app.main = app.main || function () {
 
     if (this.gameState === this.GAME_STATE.LOADING) {
       this.graphics.clear();
-      this.graphics.drawText('WEBCRAFT 2', this.GAME.WIDTH / 2 - 128, this.GAME.HEIGHT / 2 - 18, '32pt courier', '#22ff22');
+
+      this.graphics.drawText('WEBCRAFT 2', this.GAME.WIDTH / 2 - 152, this.GAME.HEIGHT / 2 - 18, '32pt courier', '#22ff22');
       this.graphics.drawText(this.genMessage, this.GAME.WIDTH / 2 - this.genMessage.length * 8, this.GAME.HEIGHT / 2 + 20, '16pt courier', '#fff');
       this.graphics.drawText('[' + this.genStr + '] ' + this.genPercent + '%', this.GAME.WIDTH / 2 - 162, this.GAME.HEIGHT / 2 + 80, '18pt courier', '#fff');
     } else if (this.gameState === this.GAME_STATE.BEGIN) {
       this.graphics.clear();
-      this.graphics.drawText('WEBCRAFT 2', this.GAME.WIDTH / 2 - 128, this.GAME.HEIGHT / 2 - 18, '32pt courier', '#22ff22');
+
+      this.graphics.drawText('WEBCRAFT 2', this.GAME.WIDTH / 2 - 152, this.GAME.HEIGHT / 2 - 18, '32pt courier', '#22ff22');
       this.graphics.drawText('Click to start', this.GAME.WIDTH / 2 - 112, this.GAME.HEIGHT / 2 + 20, '16pt courier', '#fff');
       this.graphics.drawText('Instructions:', this.GAME.WIDTH / 2 - 117, this.GAME.HEIGHT / 2 + 80, '18pt courier', '#fff');
       this.graphics.drawText('WASDEQ to move', this.GAME.WIDTH / 2 - 126, this.GAME.HEIGHT / 2 + 115, '18pt courier', 'A0A0A0');
@@ -2040,6 +2078,7 @@ app.main = app.main || function () {
       this.worldTime = this.cycleTime / 4;
     } else if (this.gameState === this.GAME_STATE.PAUSED) {
       this.graphics.clear();
+
       this.graphics.drawText('PAUSED', this.GAME.WIDTH / 2 - 54, this.GAME.HEIGHT / 2 - 9, '18pt courier', '#fff');
     } else if (this.gameState === this.GAME_STATE.DEFAULT) {
       if (this.handleKeyPress) {
@@ -2070,57 +2109,58 @@ app.main = app.main || function () {
     }
 
     this.handleSky();
-  }), _defineProperty(_ref, 'keyCheck', function keyCheck(dt) {
+  },
+  keyCheck: function keyCheck(dt) {
     var cam = this.graphics.getActiveCamera().transform;
     var yaw = cam.rotation.elements[1];
-    if (this.myKeys.keydown[87]) // forward - w
-      {
-        cam.position.elements[0] -= Math.sin(yaw) * 20 * dt;
-        cam.position.elements[2] -= Math.cos(yaw) * 20 * dt;
-      }
-    if (this.myKeys.keydown[83]) // back - s
-      {
-        cam.position.elements[0] += Math.sin(yaw) * 20 * dt;
-        cam.position.elements[2] += Math.cos(yaw) * 20 * dt;
-      }
-    if (this.myKeys.keydown[65]) // left - a
-      {
-        cam.position.elements[0] -= Math.cos(yaw) * 20 * dt;
-        cam.position.elements[2] += Math.sin(yaw) * 20 * dt;
-      }
-    if (this.myKeys.keydown[68]) // right - d
-      {
-        cam.position.elements[0] += Math.cos(yaw) * 20 * dt;
-        cam.position.elements[2] -= Math.sin(yaw) * 20 * dt;
-      }
-    if (this.myKeys.keydown[81]) // down - q
-      {
-        cam.position.elements[1] -= 20 * dt;
-      }
-    if (this.myKeys.keydown[69]) // up - e
-      {
-        cam.position.elements[1] += 20 * dt;
-      }
+    if (this.myKeys.keydown[87]) {
+      // forward - w
+      cam.position.elements[0] -= Math.sin(yaw) * 20 * dt;
+      cam.position.elements[2] -= Math.cos(yaw) * 20 * dt;
+    }
+    if (this.myKeys.keydown[83]) {
+      // back - s
+      cam.position.elements[0] += Math.sin(yaw) * 20 * dt;
+      cam.position.elements[2] += Math.cos(yaw) * 20 * dt;
+    }
+    if (this.myKeys.keydown[65]) {
+      // left - a
+      cam.position.elements[0] -= Math.cos(yaw) * 20 * dt;
+      cam.position.elements[2] += Math.sin(yaw) * 20 * dt;
+    }
+    if (this.myKeys.keydown[68]) {
+      // right - d
+      cam.position.elements[0] += Math.cos(yaw) * 20 * dt;
+      cam.position.elements[2] -= Math.sin(yaw) * 20 * dt;
+    }
+    if (this.myKeys.keydown[81]) {
+      // down - q
+      cam.position.elements[1] -= 20 * dt;
+    }
+    if (this.myKeys.keydown[69]) {
+      // up - e
+      cam.position.elements[1] += 20 * dt;
+    }
 
     // Inverted up/down
-    if (this.myKeys.keydown[38]) // up
-      {
-        cam.rotation.elements[0] -= 2 * dt; // look up
-      }
-    if (this.myKeys.keydown[40]) // down
-      {
-        cam.rotation.elements[0] += 2 * dt; // peer down
-      }
-    if (this.myKeys.keydown[37]) // left
-      {
-        cam.rotation.elements[1] += 2 * dt; // look left
-      }
-    if (this.myKeys.keydown[39]) // right
-      {
-        cam.rotation.elements[1] -= 2 * dt; // peer right
-      }
+    if (this.myKeys.keydown[38]) {
+      // up
+      cam.rotation.elements[0] -= 2 * dt; // look up
+    }
+    if (this.myKeys.keydown[40]) {
+      // down
+      cam.rotation.elements[0] += 2 * dt; // peer down
+    }
+    if (this.myKeys.keydown[37]) {
+      // left
+      cam.rotation.elements[1] += 2 * dt; // look left
+    }
+    if (this.myKeys.keydown[39]) {
+      // right
+      cam.rotation.elements[1] -= 2 * dt; // peer right
+    }
 
-    cam.rotation.elements[0] = clamp(cam.rotation.elements[0], -1.5, 1.5);
+    cam.rotation.elements[0] = window.clamp(cam.rotation.elements[0], -1.5, 1.5);
 
     var x = -Math.sin(cam.rotation.elements[1] - 0.4) * 1.5;
     var z = -Math.cos(cam.rotation.elements[1] - 0.4) * 1.5;
@@ -2146,28 +2186,29 @@ app.main = app.main || function () {
       this.musicPaused = false;
       this.musicPlayer.resume();
     }
-  }), _defineProperty(_ref, 'calculateDeltaTime', function calculateDeltaTime() {
-    var now = void 0,
-        fps = void 0;
-    now = performance.now();
-    fps = 1000 / (now - this.lastTime);
-    // fps = clamp(fps, 12, 60);
+  },
+  calculateDeltaTime: function calculateDeltaTime() {
+    var now = performance.now();
+    var fps = 1000 / (now - this.lastTime);
     this.lastTime = now;
     return 1 / fps;
-  }), _defineProperty(_ref, 'doMousedown', function doMousedown(e) {
-    var mouse = getMouse(e);
+  },
+  doMousedown: function doMousedown(e) {
+    var mouse = window.getMouse(e);
 
     this.pmouse = mouse;
     this.canvas.requestPointerLock();
 
     this.resumeGame();
-  }), _defineProperty(_ref, 'lockChangeAlert', function lockChangeAlert(e) {
+  },
+  lockChangeAlert: function lockChangeAlert() {
     if (document.pointerLockElement === this.canvas || document.mozPointerLockElement === this.canvas) {
       this.resumeGame();
     } else {
       // this.pauseGame();
     }
-  }), _defineProperty(_ref, 'pauseGame', function pauseGame() {
+  },
+  pauseGame: function pauseGame() {
     if (this.gameState === this.GAME_STATE.DEFAULT) {
       cancelAnimationFrame(this.animationID);
       this.gameState = this.GAME_STATE.PAUSED;
@@ -2175,7 +2216,8 @@ app.main = app.main || function () {
       this.update();
       this.musicPlayer.pause();
     }
-  }), _defineProperty(_ref, 'resumeGame', function resumeGame() {
+  },
+  resumeGame: function resumeGame() {
     if (this.gameState === this.GAME_STATE.BEGIN || this.gameState === this.GAME_STATE.PAUSED) {
       cancelAnimationFrame(this.animationID);
       this.gameState = this.GAME_STATE.DEFAULT;
@@ -2185,8 +2227,9 @@ app.main = app.main || function () {
         this.musicPlayer.resume();
       }
     }
-  }), _defineProperty(_ref, 'getAltitude', function getAltitude(period, time, shift) {
-    if (period == 0) {
+  },
+  getAltitude: function getAltitude(period, time, shift) {
+    if (period === 0) {
       return 0.25;
     }
     var f1 = time % period / period - 0.25;
@@ -2203,13 +2246,16 @@ app.main = app.main || function () {
     f1 = 1.0 - (Math.cos(f1 * Math.PI) + 1.0) / 2.0;
     f1 = f2 + (f1 - f2) / 3.0;
     return f1 + shift / 360.0 + 0.25;
-  }), _defineProperty(_ref, 'getSkyColor', function getSkyColor(altitude) {
+  },
+  getSkyColor: function getSkyColor(altitude) {
     return Math.cos((altitude + 0.5) * Math.PI * 2.0) * 2.0 + 0.5;
-  }), _defineProperty(_ref, 'getSkyBlend', function getSkyBlend() {
+  },
+  getSkyBlend: function getSkyBlend() {
     var temp = 2.0; // MC "Desert" biome
     var k = Math.max(-1.0, Math.min(1.0, temp / 3.0));
     return $V([0.6222 - k * 0.05, 0.5 + k * 0.1, 1.0]);
-  }), _defineProperty(_ref, 'handleSky', function handleSky() {
+  },
+  handleSky: function handleSky() {
     var sunAlt = this.getAltitude(this.cycleTime, this.worldTime, 0);
     var moonAlt = this.getAltitude(this.cycleTime, this.worldTime, 180);
 
@@ -2226,10 +2272,13 @@ app.main = app.main || function () {
     this.sun.intensity = $V([0.5, 0.4, 0.4]).multiply(gradient);
 
     this.worldTime++;
-  }), _defineProperty(_ref, 'drawCelestial', function drawCelestial(obj, altitude, camPos) {
+  },
+  drawCelestial: function drawCelestial(o, altitude, camPos) {
+    var obj = o;
     var a = (altitude + 0.5) * Math.PI * 2 % (Math.PI * 2);
     obj.transform.position = $V([0, 180, 0]).rotate(a, $L([0, 0, 0], [0, 0, 1])).add(camPos);
-  }), _defineProperty(_ref, 'readableTime', function readableTime() {
+  },
+  readableTime: function readableTime() {
     var ticks = this.worldTime / this.cycleTime % 1.0 * 1440;
     var theHour = Math.floor(ticks / 60);
     var absHour = Math.abs(theHour);
@@ -2237,8 +2286,8 @@ app.main = app.main || function () {
     var aMinute = Math.abs(tMinute);
     var aMin = (aMinute < 10 ? '0' : '') + aMinute;
     return (theHour < 0 || tMinute < 0 ? '-' : '') + absHour + ':' + aMin;
-  }), _ref;
-}();
+  }
+};
 "use strict";
 
 var app = app || {};
