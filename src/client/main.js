@@ -204,8 +204,10 @@ app.main = app.main || {
       this.graphics.drawText(`x : ${(pos[0]).toFixed(1)}`, 8, 20, '10pt "Ubuntu Mono"', '#A0A0A0');
       this.graphics.drawText(`y : ${(pos[1]).toFixed(1)}`, 8, 32, '10pt "Ubuntu Mono"', '#A0A0A0');
       this.graphics.drawText(`z : ${(pos[2]).toFixed(1)}`, 8, 44, '10pt "Ubuntu Mono"', '#A0A0A0');
-      this.graphics.drawText(`g : ${this.user.onGround }`, 8, 56, '10pt "Ubuntu Mono"', '#A0A0A0');
-      this.graphics.drawText(`h : ${this.user.height   }`, 8, 68, '10pt "Ubuntu Mono"', '#A0A0A0');
+      if (this.user) {
+        this.graphics.drawText(`g : ${this.user.onGround }`, 8, 56, '10pt "Ubuntu Mono"', '#A0A0A0');
+        this.graphics.drawText(`h : ${this.user.height   }`, 8, 68, '10pt "Ubuntu Mono"', '#A0A0A0');
+      }
         // Draw rtime in top right corner
       this.graphics.drawText(this.readableTime(),
         this.GAME.WIDTH - 60, 20, '10pt "Ubuntu Mono"', '#A0A0A0');
