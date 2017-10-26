@@ -2143,10 +2143,12 @@ app.main = app.main || {
       this.handleKeyPress = false;
       this.worldTime = 0;
       this.musicPlayer.pause();
-      var mesh = this.chunkMeshData[this.chunkMeshData.length - 1];
-      mesh.unregister();
-      this.graphics.freeMesh(mesh.mesh);
-      this.chunkMeshData.pop();
+      if (this.chunkMeshData.length > 0) {
+        var mesh = this.chunkMeshData[this.chunkMeshData.length - 1];
+        mesh.unregister();
+        this.graphics.freeMesh(mesh.mesh);
+        this.chunkMeshData.pop();
+      }
     }
 
     if (this.debug) {
@@ -2191,27 +2193,27 @@ app.main = app.main || {
 
     if (this.myKeys.keydown[87]) {
       // forward - w
-      cam.position.elements[0] -= Math.sin(yaw) * 20 * dt;
-      cam.position.elements[2] -= Math.cos(yaw) * 20 * dt;
+      cam.position.elements[0] -= Math.sin(yaw) * 200 * dt;
+      cam.position.elements[2] -= Math.cos(yaw) * 200 * dt;
     }
     if (this.myKeys.keydown[83]) {
       // back - s
-      cam.position.elements[0] += Math.sin(yaw) * 20 * dt;
-      cam.position.elements[2] += Math.cos(yaw) * 20 * dt;
+      cam.position.elements[0] += Math.sin(yaw) * 200 * dt;
+      cam.position.elements[2] += Math.cos(yaw) * 200 * dt;
     }
     if (this.myKeys.keydown[65]) {
       // left - a
-      cam.position.elements[0] -= Math.cos(yaw) * 20 * dt;
-      cam.position.elements[2] += Math.sin(yaw) * 20 * dt;
+      cam.position.elements[0] -= Math.cos(yaw) * 200 * dt;
+      cam.position.elements[2] += Math.sin(yaw) * 200 * dt;
     }
     if (this.myKeys.keydown[68]) {
       // right - d
-      cam.position.elements[0] += Math.cos(yaw) * 20 * dt;
-      cam.position.elements[2] -= Math.sin(yaw) * 20 * dt;
+      cam.position.elements[0] += Math.cos(yaw) * 200 * dt;
+      cam.position.elements[2] -= Math.sin(yaw) * 200 * dt;
     }
     if (this.myKeys.keydown[32] && this.user.onGround) {
       // up - space
-      cam.position.elements[1] += 50 * dt;
+      cam.position.elements[1] += 500 * dt;
     }
 
     // Inverted up/down
@@ -2241,7 +2243,7 @@ app.main = app.main || {
     this.user.rotationP = cam.rotation.elements[0];
     this.user.rotationT = cam.rotation.elements[1];
 
-    this.user.alpha = 1;
+    this.user.alpha = 0;
 
     // Entity update
     var keys = Object.keys(this.entityList);
