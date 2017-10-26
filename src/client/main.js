@@ -61,6 +61,8 @@ app.main = app.main || {
   entityList: { },
   user: null,
 
+  updateRequired: false,
+
   // methods
   init() {
     // Initialize properties
@@ -183,12 +185,27 @@ app.main = app.main || {
       }
     }
 
+    if (this.updateRequired) {
+      this.graphics.clear();
+      this.graphics.drawText('PLEASE REFRESH AND UPDATE',
+        this.GAME.WIDTH / 2 - 200, this.GAME.HEIGHT / 2 + 20, '16pt "Ubuntu Mono"', '#f00');
+      this.handleKeyPress = false;
+      this.worldTime = 0;
+      this.musicPlayer.pause();
+      const mesh = this.chunkMeshData[this.chunkMeshData.length-1];
+      mesh.unregister();
+      this.graphics.freeMesh(mesh.mesh);
+      this.chunkMeshData.pop();
+    }
+
     if (this.debug) {
       const pos = cam.position.elements;
         // Draw camera in top left corner
       this.graphics.drawText(`x : ${(pos[0]).toFixed(1)}`, 8, 20, '10pt "Ubuntu Mono"', '#A0A0A0');
       this.graphics.drawText(`y : ${(pos[1]).toFixed(1)}`, 8, 32, '10pt "Ubuntu Mono"', '#A0A0A0');
       this.graphics.drawText(`z : ${(pos[2]).toFixed(1)}`, 8, 44, '10pt "Ubuntu Mono"', '#A0A0A0');
+      this.graphics.drawText(`g : ${this.user.onGround }`, 8, 56, '10pt "Ubuntu Mono"', '#A0A0A0');
+      this.graphics.drawText(`h : ${this.user.height   }`, 8, 68, '10pt "Ubuntu Mono"', '#A0A0A0');
         // Draw rtime in top right corner
       this.graphics.drawText(this.readableTime(),
         this.GAME.WIDTH - 60, 20, '10pt "Ubuntu Mono"', '#A0A0A0');
@@ -239,11 +256,8 @@ app.main = app.main || {
       cam.position.elements[0] += Math.cos(yaw) * 20 * dt;
       cam.position.elements[2] -= Math.sin(yaw) * 20 * dt;
     }
-    if (this.myKeys.keydown[81]) { // down - q
-      cam.position.elements[1] -= 20 * dt;
-    }
-    if (this.myKeys.keydown[69]) { // up - e
-      cam.position.elements[1] += 20 * dt;
+    if (this.myKeys.keydown[32] && this.user.onGround) { // up - space
+      cam.position.elements[1] += 50 * dt;
     }
 
       // Inverted up/down
@@ -311,14 +325,8 @@ app.main = app.main || {
       }
     }
 
-    if (this.user.x !== this.user.prevX
-      || this.user.y !== this.user.prevY
-      || this.user.z !== this.user.prevZ
-      || this.user.rotationT !== this.user.prevRotationT
-      || this.user.rotationP !== this.user.prevRotationP) {
-      // Emit update
-      this.genWorker.emit('movement', this.getSendingUser());
-    }
+    // Emit update
+    this.genWorker.emit('movement', this.getSendingUser());
   },
 
   getSendingUser() {
@@ -334,6 +342,9 @@ app.main = app.main || {
       destZ: this.user.destZ,
       rotationT: this.user.rotationT,
       rotationP: this.user.rotationP,
+      onGround: this.user.onGround,
+      height: this.user.height,
+      lastUpdate: this.user.lastUpdate,
     };
   },
 
@@ -445,24 +456,20 @@ app.main = app.main || {
 
   handleConnection() {
     this.genWorker.on('genMsg', (data) => {
-      this.gameState = this.GAME_STATE.LOADING;
+      if (this.gameState !== this.GAME_STATE.LOADING) {
+        this.updateRequired = true;
+        return;
+      }
       this.genMessage = data.genMessage;
       this.genStr = data.genStr;
       this.genPercent = data.genPercent;
     });
 
     this.genWorker.on('meshData', (data) => {
-      this.gameState = this.GAME_STATE.LOADING;
-      const meshData = data.meshData;
-
-      if (data.start) {
-        for (let i = 0; i < this.chunkMeshData.length; i++) {
-          const mesh = this.chunkMeshData[i];
-          this.graphics.freeMesh(mesh);
-          mesh.unregister();
-        }
-        this.chunkMeshData = [];
+      if (this.gameState !== this.GAME_STATE.LOADING) {
+        return;
       }
+      const meshData = data.meshData;
 
       for (let i = 0; i < meshData.str.length; i++) {
         const tex = `chunk${meshData.chunkIndex}-${i}`;
@@ -477,6 +484,7 @@ app.main = app.main || {
         mesh.register();
         this.chunkMeshData.push(mesh);
       }
+
       if (data.finished) {
         this.gameState = this.GAME_STATE.BEGIN;
       }
@@ -495,6 +503,7 @@ app.main = app.main || {
         entity.mesh = new MeshRenderable({
           mesh: 'assets/meshes/cube.obj',
           position: $V([data.x, data.y, data.z]),
+          scale: data.selfUser ? $V([0, 0, 0]) : $V([1, 1, 1]),
         });
         entity.mesh.register();
 
@@ -516,13 +525,22 @@ app.main = app.main || {
 
         if (data.selfUser) {
           this.user = entity;
+          const cam = this.graphics.getActiveCamera().transform;
+          cam.position.elements[0] = entity.x;
+          cam.position.elements[1] = entity.y;
+          cam.position.elements[2] = entity.z;
+          cam.rotation.elements[0] = entity.rotationP;
+          cam.rotation.elements[1] = entity.rotationT;
         }
         return;
       }
-      if (entity && entity.lastUpdate >= data.lastUpdate) {
+      if (entity.lastUpdate >= data.lastUpdate) {
         return;
       }
       entity.lastUpdate = data.lastUpdate;
+      entity.x = data.x;
+      entity.y = data.y;
+      entity.z = data.z;
       entity.prevX = data.prevX;
       entity.prevY = data.prevY;
       entity.prevZ = data.prevZ;
@@ -531,10 +549,12 @@ app.main = app.main || {
       entity.destZ = data.destZ;
       entity.rotationT = data.rotationT;
       entity.rotationP = data.rotationP;
+      entity.onGround = data.onGround;
+      entity.height = data.height;
       entity.alpha = 0;
-      entity.mesh.transform.position.elements[0] = data.x;
-      entity.mesh.transform.position.elements[1] = data.y;
-      entity.mesh.transform.position.elements[2] = data.z;
+      entity.mesh.transform.position.elements[0] = entity.x;
+      entity.mesh.transform.position.elements[1] = entity.y;
+      entity.mesh.transform.position.elements[2] = entity.z;
 
       if (entity === this.user) {
         const cam = this.graphics.getActiveCamera().transform;

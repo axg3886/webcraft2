@@ -38,6 +38,7 @@ TYPE_CUBE[TYPES.air] = false;
 TYPE_CUBE[TYPES.stair] = false;
 
 const TYPE_OPAQUE = makeTypeArray(true);
+TYPE_OPAQUE[TYPES.air] = false;
 TYPE_OPAQUE[TYPES.water] = false;
 TYPE_OPAQUE[TYPES.lava] = false;
 TYPE_OPAQUE[TYPES.leaf] = false;
@@ -86,6 +87,19 @@ const makeChunk = (i, j) => {
   const globalX = x => (i << 4) + x;
   const globalZ = z => (j << 4) + z;
   const height = (x, z) => heightMap[(x * CHUNK_SIZE) + z];
+  const recalcHeight = () => {
+    for (let n = 0; n < CHUNK_SIZE; n++) {
+      for (let m = 0; m < CHUNK_SIZE; m++) {
+        let s = false;
+        for (let o = CHUNK_HEIGHT - 1; !s && o > -1; o--) {
+          if (get(n, o, m) !== TYPES.air) {
+            heightMap[(n * CHUNK_SIZE) + m] = o;
+            s = true;
+          }
+        }
+      }
+    }
+  };
   let k;
   let x;
   let z;
@@ -117,6 +131,7 @@ const makeChunk = (i, j) => {
     chunkX: i,
     chunkZ: j,
     height,
+    recalcHeight,
   });
 };
 
@@ -125,10 +140,17 @@ const makeWorld = () => {
   const indexed = i => world[i];
   const getChunk = (i, j) => indexed((i * NUM_CHUNKS) + j);
   const setChunk = (i, j, v) => { world[(i * NUM_CHUNKS) + j] = v; };
-  const chunk = (x, z) => getChunk(x >> 4, z >> 4);
-  const get = (x, y, z) => chunk(x, z).get(x % 16, y, z % 16);
-  const set = (x, y, z, v) => { chunk(x, z).set(x % 16, y, z % 16, v); };
-  const height = (x, z) => chunk(x, z).height(x % 16, z % 16);
+  const chunk = (x, z, o) => { const c = getChunk(x >> 4, z >> 4); return c ? o(c) : undefined; };
+  const get = (x, y, z) => chunk(x, z, c => c.get(x % 16, y, z % 16));
+  const set = (x, y, z, v) => { chunk(x, z, c => c.set(x % 16, y, z % 16, v)); };
+  const height = (x, z) => chunk(x, z, c => c.height(x % 16, z % 16));
+  const recalcHeight = () => {
+    for (let x = 0; x < NUM_CHUNKS; x++) {
+      for (let z = 0; z < NUM_CHUNKS; z++) {
+        getChunk(x, z).recalcHeight();
+      }
+    }
+  };
   let i;
   let j;
 
@@ -146,6 +168,7 @@ const makeWorld = () => {
     getChunk,
     setChunk,
     height,
+    recalcHeight,
     length: world.length,
     indexed,
   });

@@ -72,6 +72,7 @@ const generateWorld = () => {
       }
       genAmount++;
     } else {
+      world.recalcHeight();
       genAmount = 0;
       genMax = world.length;
       genState = GEN_STATE.MESH;
@@ -95,6 +96,7 @@ const generateWorld = () => {
     if (genAmount >= genMax) {
       genState = GEN_STATE.END;
       console.log(genState);
+      world.recalcHeight();
     }
   }
   // Update message
@@ -104,7 +106,7 @@ const generateWorld = () => {
 const makeEntity = (name) => {
   const centerX = worldGen.WORLD_SIZE / 2 + worldGen.nextInt(6) - 3;
   const centerZ = worldGen.WORLD_SIZE / 2 + worldGen.nextInt(6) - 3;
-  const centerY = world.height(centerX, centerZ) * worldGen.CHUNK_HEIGHT;
+  const centerY = world.height(centerX, centerZ) + 3;
   const e = {
     name,
     id: xxh.h32(`${entityId++}${Date.now()}`, 0xCAFEBABE).toString(16),
@@ -118,8 +120,9 @@ const makeEntity = (name) => {
     destX: centerX,
     destY: centerY,
     destZ: centerZ,
-    rotationP: -10,
+    rotationP: -0.2,
     rotationT: 0,
+    onGround: true,
   };
   return e;
 };
@@ -176,8 +179,19 @@ const startSocketServer = (io) => {
       if (!player) {
         return;
       }
+
+      // Height check
+      const floorX = Math.floor(data.x); const floorZ = Math.floor(data.z);
+      const height = world.height(floorX, floorZ) + 3;
+      const shiftY = Math.max(height, data.y);
+      const block = world.get(floorX, Math.floor(shiftY - 3), floorZ);
+      let gravity = 0.04905;
+      if (block === worldGen.TYPES.water) {
+        gravity *= 0.5; // Fall slower in water
+      }
+
       player.x = data.x;
-      player.y = data.y;
+      player.y = shiftY - gravity;
       player.z = data.z;
       player.prevX = data.prevX;
       player.prevY = data.prevY;
@@ -188,7 +202,9 @@ const startSocketServer = (io) => {
       player.rotationP = data.rotationP;
       player.rotationT = data.rotationT;
       player.lastUpdate = new Date().getTime();
-      socket.broadcast.emit('update', player);
+      player.onGround = block !== worldGen.TYPES.air;
+      player.height = height;
+      io.emit('update', player);
     });
   });
 

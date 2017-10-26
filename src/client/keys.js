@@ -17,6 +17,10 @@ app.myKeys = (function () {
     KEY_DOWN: 40,
     KEY_SPACE: 32,
     KEY_SHIFT: 16,
+    KEY_A: 65,
+    KEY_D: 68,
+    KEY_S: 83,
+    KEY_W: 87,
   });
 
 	// myKeys.keydown array to keep track of which keys are down
