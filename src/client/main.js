@@ -173,7 +173,7 @@ app.main = app.main || {
         this.GAME.WIDTH / 2 - 54, this.GAME.HEIGHT / 2 - 9, '18pt "Ubuntu Mono"', '#fff');
     } else if (this.gameState === this.GAME_STATE.DEFAULT) {
       if (this.handleKeyPress) {
-        this.keyCheck(dt);
+        this.keyCheck();
       }
 
       this.graphics.draw(dt);
@@ -207,8 +207,8 @@ app.main = app.main || {
       this.graphics.drawText(`y : ${(pos[1]).toFixed(1)}`, 8, 32, '10pt "Ubuntu Mono"', '#A0A0A0');
       this.graphics.drawText(`z : ${(pos[2]).toFixed(1)}`, 8, 44, '10pt "Ubuntu Mono"', '#A0A0A0');
       if (this.user) {
-        this.graphics.drawText(`g : ${this.user.onGround }`, 8, 56, '10pt "Ubuntu Mono"', '#A0A0A0');
-        this.graphics.drawText(`h : ${this.user.height   }`, 8, 68, '10pt "Ubuntu Mono"', '#A0A0A0');
+        this.graphics.drawText(`g : ${this.user.onGround}`, 8, 56, '10pt "Ubuntu Mono"', '#A0A0A0');
+        this.graphics.drawText(`h : ${this.user.height}`, 8, 68, '10pt "Ubuntu Mono"', '#A0A0A0');
       }
         // Draw rtime in top right corner
       this.graphics.drawText(this.readableTime(),
@@ -224,16 +224,11 @@ app.main = app.main || {
     this.handleSky();
   },
 
-  keyCheck(dt) {
-    const cam = this.graphics.getActiveCamera().transform;
-    const yaw = cam.rotation.elements[1];
+  keyCheck() {
+    const yaw = this.user.rot.y;
 
-    this.user.prevX = this.user.x;
-    this.user.prevY = this.user.y;
-    this.user.prevZ = this.user.z;
-
-    this.user.prevRotationT = this.user.rotationT;
-    this.user.prevRotationP = this.user.rotationP;
+    this.user.pos.updatePrev();
+    this.user.rot.updatePrev();
 
     if (this.myKeys.keydown[80]) {
       this.musicPaused = true;
@@ -245,47 +240,39 @@ app.main = app.main || {
     }
 
     if (this.myKeys.keydown[87]) { // forward - w
-      cam.position.elements[0] -= Math.sin(yaw) * 200 * dt;
-      cam.position.elements[2] -= Math.cos(yaw) * 200 * dt;
+      this.user.pos.destX -= Math.sin(yaw) * 2;
+      this.user.pos.destZ -= Math.cos(yaw) * 2;
     }
     if (this.myKeys.keydown[83]) { // back - s
-      cam.position.elements[0] += Math.sin(yaw) * 200 * dt;
-      cam.position.elements[2] += Math.cos(yaw) * 200 * dt;
+      this.user.pos.destX += Math.sin(yaw) * 2;
+      this.user.pos.destZ += Math.cos(yaw) * 2;
     }
     if (this.myKeys.keydown[65]) { // left - a
-      cam.position.elements[0] -= Math.cos(yaw) * 200 * dt;
-      cam.position.elements[2] += Math.sin(yaw) * 200 * dt;
+      this.user.pos.destX -= Math.cos(yaw) * 2;
+      this.user.pos.destZ += Math.sin(yaw) * 2;
     }
     if (this.myKeys.keydown[68]) { // right - d
-      cam.position.elements[0] += Math.cos(yaw) * 200 * dt;
-      cam.position.elements[2] -= Math.sin(yaw) * 200 * dt;
+      this.user.pos.destX += Math.cos(yaw) * 2;
+      this.user.pos.destZ -= Math.sin(yaw) * 2;
     }
     if (this.myKeys.keydown[32] && this.user.onGround) { // up - space
-      cam.position.elements[1] += 500 * dt;
+      this.user.pos.destY += 50;
     }
 
       // Inverted up/down
     if (this.myKeys.keydown[38]) { // up
-      cam.rotation.elements[0] -= 2 * dt; // look up
+      this.user.rot.destX -= 0.02; // look up
     }
     if (this.myKeys.keydown[40]) { // down
-      cam.rotation.elements[0] += 2 * dt; // peer down
+      this.user.rot.destX += 0.02; // peer down
     }
     if (this.myKeys.keydown[37]) { // left
-      cam.rotation.elements[1] += 2 * dt; // look left
+      this.user.rot.destY += 0.02; // look left
     }
     if (this.myKeys.keydown[39]) { // right
-      cam.rotation.elements[1] -= 2 * dt; // peer right
+      this.user.rot.destY -= 0.02; // peer right
     }
-
-    cam.rotation.elements[0] = window.clamp(cam.rotation.elements[0], -1.5, 1.5);
-
-    this.user.destX = cam.position.elements[0];
-    this.user.destY = cam.position.elements[1];
-    this.user.destZ = cam.position.elements[2];
-
-    this.user.rotationP = cam.rotation.elements[0];
-    this.user.rotationT = cam.rotation.elements[1];
+    this.user.rot.destX = window.clamp(this.user.rot.destX, -1.5, 1.5);
 
     this.user.alpha = 0;
 
@@ -300,33 +287,28 @@ app.main = app.main || {
       }
 
       // Lerp position
-      entity.x = window.lerp(entity.prevX, entity.destX, entity.alpha);
-      entity.y = window.lerp(entity.prevY, entity.destY, entity.alpha);
-      entity.z = window.lerp(entity.prevZ, entity.destZ, entity.alpha);
+      entity.pos.lerp(entity.alpha);
+      entity.rot.lerp(entity.alpha);
 
-      const x = -Math.sin(entity.rotationT - 0.4) * 1.5;
-      const z = -Math.cos(entity.rotationT - 0.4) * 1.5;
+      const x = -Math.sin(entity.rot.destY - 0.4) * 1.5;
+      const z = -Math.cos(entity.rot.destY - 0.4) * 1.5;
 
-      const tx = -Math.sin(entity.rotationT - 0.42) * 1.5;
-      const tz = -Math.cos(entity.rotationT - 0.42) * 1.5;
+      const tx = -Math.sin(entity.rot.destY - 0.42) * 1.5;
+      const tz = -Math.cos(entity.rot.destY - 0.42) * 1.5;
 
-      entity.torchParticle.transform.position.elements[0] = x + entity.x;
-      entity.torchParticle.transform.position.elements[1] = entity.y - 0.3;
-      entity.torchParticle.transform.position.elements[2] = z + entity.z;
+      entity.updateMesh();
 
-      entity.torch.transform.position.elements[0] = tx + entity.x;
-      entity.torch.transform.position.elements[1] = entity.y - 0.5;
-      entity.torch.transform.position.elements[2] = tz + entity.z;
+      entity.torchParticle.transform.position.elements[0] = x + entity.pos.x;
+      entity.torchParticle.transform.position.elements[1] = entity.pos.y - 0.3;
+      entity.torchParticle.transform.position.elements[2] = z + entity.pos.z;
+
+      entity.torch.transform.position.elements[0] = tx + entity.pos.x;
+      entity.torch.transform.position.elements[1] = entity.pos.y - 0.5;
+      entity.torch.transform.position.elements[2] = tz + entity.pos.z;
 
       entity.torchLight.position = entity.torch.transform.position;
 
-      entity.torch.transform.rotation.elements[1] = cam.rotation.elements[1];
-
-      if (entity === this.user) {
-        cam.position.elements[0] = entity.x;
-        cam.position.elements[1] = entity.y;
-        cam.position.elements[2] = entity.z;
-      }
+      entity.torch.transform.rotation.elements[1] = entity.rot.destY;
     }
 
     // Emit update
@@ -335,17 +317,8 @@ app.main = app.main || {
 
   getSendingUser() {
     return {
-      x: this.user.x,
-      y: this.user.y,
-      z: this.user.z,
-      prevX: this.user.prevX,
-      prevY: this.user.prevY,
-      prevZ: this.user.prevZ,
-      destX: this.user.destX,
-      destY: this.user.destY,
-      destZ: this.user.destZ,
-      rotationT: this.user.rotationT,
-      rotationP: this.user.rotationP,
+      pos: this.user.pos,
+      rot: this.user.rot,
       onGround: this.user.onGround,
       height: this.user.height,
       lastUpdate: this.user.lastUpdate,
@@ -458,6 +431,21 @@ app.main = app.main || {
     return `${((theHour < 0 || tMinute < 0) ? '-' : '') + absHour}:${aMin}`;
   },
 
+  convertVector(input) {
+    const ref = input;
+    ref.updatePrev = () => {
+      ref.prevX = ref.x;
+      ref.prevY = ref.y;
+      ref.prevZ = ref.z;
+    };
+    ref.lerp = (alpha) => {
+      ref.x = window.lerp(ref.prevX, ref.destX, alpha);
+      ref.y = window.lerp(ref.prevY, ref.destY, alpha);
+      ref.z = window.lerp(ref.prevZ, ref.destZ, alpha);
+    };
+    return ref;
+  },
+
   handleConnection() {
     this.genWorker.on('genMsg', (data) => {
       if (this.gameState !== this.GAME_STATE.LOADING) {
@@ -503,13 +491,28 @@ app.main = app.main || {
 
       if (!entity) {
         entity = this.entityList[data.id] = data;
+        entity.pos = this.convertVector(data.pos);
+        entity.rot = this.convertVector(data.rot);
 
-        entity.mesh = new MeshRenderable({
-          mesh: 'assets/meshes/cube.obj',
-          position: $V([data.x, data.y, data.z]),
-          scale: data.selfUser ? $V([0, 0, 0]) : $V([1, 1, 1]),
-        });
-        entity.mesh.register();
+        if (data.selfUser) {
+          entity.mesh = this.graphics.getActiveCamera();
+          this.user = entity;
+        } else {
+          entity.mesh = new MeshRenderable({
+            mesh: 'assets/meshes/cube.obj',
+            position: $V([data.pos.x, data.pos.y, data.pos.z]),
+          });
+          entity.mesh.register();
+        }
+
+        entity.updateMesh = () => {
+          entity.mesh.transform.position.elements[0] = entity.pos.x;
+          entity.mesh.transform.position.elements[1] = entity.pos.y;
+          entity.mesh.transform.position.elements[2] = entity.pos.z;
+          entity.mesh.transform.rotation.elements[0] = entity.rot.x;
+          entity.mesh.transform.rotation.elements[1] = entity.rot.y;
+          entity.mesh.transform.rotation.elements[2] = entity.rot.z;
+        };
 
         entity.torchParticle = new ParticleRenderable({});
         entity.torchParticle.register();
@@ -527,47 +530,21 @@ app.main = app.main || {
         entity.torchLight = new PointLight({ intensity: $V([0.6, 0.5, 0.3]), radius: 20.0 });
         entity.torchLight.register();
 
-        if (data.selfUser) {
-          this.user = entity;
-          const cam = this.graphics.getActiveCamera().transform;
-          cam.position.elements[0] = entity.x;
-          cam.position.elements[1] = entity.y;
-          cam.position.elements[2] = entity.z;
-          cam.rotation.elements[0] = entity.rotationP;
-          cam.rotation.elements[1] = entity.rotationT;
-        }
         return;
       }
+
       if (entity.lastUpdate >= data.lastUpdate) {
         return;
       }
+
       entity.lastUpdate = data.lastUpdate;
-      entity.x = data.x;
-      entity.y = data.y;
-      entity.z = data.z;
-      entity.prevX = data.prevX;
-      entity.prevY = data.prevY;
-      entity.prevZ = data.prevZ;
-      entity.destX = data.destX;
-      entity.destY = data.destY;
-      entity.destZ = data.destZ;
-      entity.rotationT = data.rotationT;
-      entity.rotationP = data.rotationP;
+      entity.pos = this.convertVector(data.pos);
+      entity.rot = this.convertVector(data.rot);
       entity.onGround = data.onGround;
       entity.height = data.height;
       entity.alpha = 0;
-      entity.mesh.transform.position.elements[0] = entity.x;
-      entity.mesh.transform.position.elements[1] = entity.y;
-      entity.mesh.transform.position.elements[2] = entity.z;
 
-      if (entity === this.user) {
-        const cam = this.graphics.getActiveCamera().transform;
-        cam.position.elements[0] = entity.x;
-        cam.position.elements[1] = entity.y;
-        cam.position.elements[2] = entity.z;
-        cam.rotation.elements[0] = entity.rotationP;
-        cam.rotation.elements[1] = entity.rotationT;
-      }
+      entity.updateMesh();
     });
 
     this.genWorker.on('heightCorrection', (data) => {
@@ -581,7 +558,7 @@ app.main = app.main || {
       this.entityList[data.id].torch.unregister();
       this.entityList[data.id].torchParticle.unregister();
       this.entityList[data.id].torchLight.unregister();
-      delete this.entityList[data.id];
+      this.entityList[data.id] = {};
     });
 
     this.genWorker.emit('join', { name: `Player${Math.floor(Math.random() * 100)}` });

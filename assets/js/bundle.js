@@ -1,5 +1,66 @@
 "use strict";
 
+var app = app || {};
+
+app.shaders = function () {
+	// Manipulates the vertices and sets up for the material shader
+	var vertexShader = "\nattribute vec3 vpos;\nattribute vec2 vtex;\nattribute vec3 vnor;\n\nuniform mat4 world;\nuniform mat4 persp;\n\nvarying vec3 pos;\nvarying vec2 uv;\nvarying vec3 norm;\n\nvoid main(void)\n{\n\tpos = vec3(world * vec4(vpos, 1.0));\n\tuv = vtex;\n\tnorm = normalize(vec3(world * vec4(vnor, 0.0)));\n\n\tgl_Position = persp * world * vec4(vpos, 1.0);\n}\n";
+
+	// Sets the shader up for the material calculation
+	var preMaterial = "\n#extension GL_EXT_draw_buffers : require\nprecision mediump float;\n\nvarying vec3 pos;\nvarying vec2 uv;\nvarying vec3 norm;\n\nvec3 diffuse = vec3(0.5);\nvec3 normal = vec3(0.0, 0.0, 1.0);\nvec3 specular = vec3(0.5);\nvec3 emission = vec3(0.0);\nfloat roughness = 0.5;\nfloat opacity = 1.0;\n";
+
+	// Interprets the results of the material
+	var postMaterial = "\nuniform vec4 camPos;\n\n// float fogStart = 64.0;\n// float fogEnd = 80.0;\n\nvoid main(void)\n{\n\tmaterial();\n\n\n\t// float dist = length(vec3(camPos) - pos);\n\t// float fog = (dist - fogStart) / (fogEnd - fogStart);\n\t// fog = clamp(fog, 0.0, 1.0);\n\n\n\tgl_FragData[0] = vec4(diffuse, opacity);\n\n\tgl_FragData[1] = vec4(norm, 0.0);\n\n\tgl_FragData[2] = vec4(specular, roughness);\n\n\tgl_FragData[3] = vec4(emission, 1.0);\n\n\tgl_FragData[4] = vec4(pos, 1.0);\n}\n";
+
+	// Creates the material function which serves as the "meat" of the material
+	var defaultMaterial = "\nuniform sampler2D diffuseTexture;\nuniform sampler2D specularTexture;\nuniform sampler2D emissionTexture;\n\nvoid material(void)\n{\n\tvec4 dTex = texture2D(diffuseTexture, uv);\n\tvec4 sTex = texture2D(specularTexture, uv);\n\tvec4 eTex = texture2D(emissionTexture, uv);\n\n\n\tdiffuse = dTex.rgb;\n\topacity = dTex.a;\n\tspecular = sTex.rgb;\n\troughness = sTex.a;\n\temission = eTex.rgb;\n}\n";
+
+	// Simple vertex shader for lights
+	var lightVertex = "\nattribute vec3 vpos;\n\nvarying vec2 uv;\n\nvoid main(void)\n{\n\tuv = vec2((vpos + vec3(1.0)) / 2.0);\n\tgl_Position = vec4(vpos, 1.0);\n}\n";
+
+	// Sets the emission value
+	var lightPrepass = "\nprecision mediump float;\n\nuniform sampler2D emission;\n\nvarying vec2 uv;\n\nvoid main(void)\n{\n\tgl_FragData[0] = texture2D(emission, uv);\n}\n";
+
+	// Ambient light pass
+	var lightAmbient = "\nprecision mediump float;\n\nuniform sampler2D diffuse;\n\nuniform vec4 intensity;\n\nvarying vec2 uv;\n\nvoid main(void)\n{\n\tvec4 dtex = texture2D(diffuse, uv);\n\tgl_FragData[0] = vec4(intensity.rgb * dtex.rgb, dtex.a);\n}\n";
+
+	var lightDirectional = "\nprecision mediump float;\n\nuniform sampler2D diffuse;\nuniform sampler2D normal;\nuniform sampler2D specular;\nuniform sampler2D position;\n\nuniform vec4 direction;\nuniform vec4 intensity;\nuniform vec4 camPos;\n\nvarying vec2 uv;\n\nvoid main(void)\n{\n\tvec3 opDir = -vec3(direction);\n\n\tvec4 dtex = texture2D(diffuse, uv);\n\n\t// DIFFUSE\n\n\tvec3 normTex = texture2D(normal, uv).rgb;\n\tfloat diff = max(dot(normTex, opDir), 0.0);\n\tvec3 diffuseIntensity = (intensity * diff).rgb * dtex.rgb;\n\n\t// SPECULAR\n\n\tvec3 fragPos = texture2D(position, uv).rgb;\n\tvec3 viewDir = normalize(vec3(camPos) - fragPos);\n\tvec3 reflectDir = reflect(vec3(direction), normTex);\n\tvec4 specTex = texture2D(specular, uv);\n\tfloat spec = pow(max(dot(viewDir, reflectDir), 0.0), 2.0 / max(specTex.a * specTex.a, 0.01));\n\tvec3 specularIntensity = (intensity.rgb * spec) * specTex.rgb;\n\n\tgl_FragData[0] = vec4(diffuseIntensity + specularIntensity, dtex.a);\n}\n";
+
+	var lightPoint = "\nprecision mediump float;\n\nuniform sampler2D diffuse;\nuniform sampler2D normal;\nuniform sampler2D specular;\nuniform sampler2D position;\n\nuniform vec4 lightPos;\nuniform vec4 intensity;\nuniform vec4 camPos;\nuniform float radius;\n\nvarying vec2 uv;\n\nvoid main(void)\n{\n\tvec3 fragPos = texture2D(position, uv).rgb;\n\n\tfloat dist = length(fragPos - vec3(lightPos));\n\tfloat power = max(1.0 - (dist / radius), 0.0);\n\n\tvec3 direction = normalize(fragPos - vec3(lightPos));\n\tvec3 opDir = -vec3(direction);\n\n\tvec4 dtex = texture2D(diffuse, uv);\n\n\t// DIFFUSE\n\n\tvec3 normTex = texture2D(normal, uv).rgb;\n\tfloat diff = max(dot(normTex, opDir), 0.0);\n\tvec3 diffuseIntensity = (intensity * diff).rgb * dtex.rgb;\n\n\t// SPECULAR\n\n\tvec3 viewDir = normalize(vec3(camPos) - fragPos);\n\tvec3 reflectDir = reflect(vec3(direction), normTex);\n\tvec4 specTex = texture2D(specular, uv);\n\tfloat spec = pow(max(dot(viewDir, reflectDir), 0.0), 2.0 / max(specTex.a * specTex.a, 0.01));\n\tvec3 specularIntensity = (intensity.rgb * spec) * specTex.rgb;\n\n\tgl_FragData[0] = vec4((diffuseIntensity + specularIntensity) * power, dtex.a);\n}\n";
+
+	// Renders particles
+	var particleVS = "\nattribute vec3 vpos;\n\nuniform mat4 cam;\nuniform mat4 persp;\n\nuniform vec4 pos;\nuniform vec2 scale;\n\nvarying vec2 uv;\nvarying vec3 newPos;\n\nvoid main(void)\n{\n\tuv = vec2((vpos + vec3(1.0)) / 2.0);\n\n\tvec3 vertPos = vec3((vpos.xy * scale.xy) * 0.1, vpos.z);\n\n\tnewPos = pos.xyz;\n\n\tvec3 tempPos = vec3(cam * pos);\n\ttempPos += vertPos;\n\n\tvec4 finalPos = persp * vec4(tempPos, 1.0);\n\n\tgl_Position = finalPos;\n}\n";
+
+	// Also renders particles
+	var particleFS = "\nprecision mediump float;\n\nuniform sampler2D texture;\nuniform sampler2D oldPos;\n\nuniform vec3 camPos;\nuniform vec2 screenSize;\n\nvarying vec2 uv;\nvarying vec3 newPos;\n\n// Get the length-squared, as it is faster\nfloat lsq(vec3 vector)\n{\n\treturn (vector.x * vector.x + vector.y * vector.y + vector.z * vector.z);\n}\n\nvoid main(void)\n{\n\tvec2 screenUV = gl_FragCoord.xy / screenSize;\n\n\tvec4 tex = texture2D(texture, uv);\n\tvec3 posTex = texture2D(oldPos, screenUV).xyz;\n\n\tfloat oldDist = lsq(posTex - camPos);\n\tfloat newDist = lsq(newPos - camPos);\n\n\tif (newDist > oldDist) { discard; }\n\n\tgl_FragData[0] = tex;\n}\n";
+
+	// Fuses the opaque and transparent framebuffers
+	var fusionFS = "\nprecision mediump float;\n\nuniform sampler2D opaque;\nuniform sampler2D transparent;\nuniform sampler2D diffuse;\nuniform sampler2D particle;\n\nuniform vec3 skyColor;\n\nvarying vec2 uv;\n\nvoid main(void)\n{\n\tvec4 opaqueTex = texture2D(opaque, uv);\n\tvec4 transparentTex = texture2D(transparent, uv);\n\tvec4 diffuseTex = texture2D(diffuse, uv);\n\tvec4 partTex = texture2D(particle, uv);\n\n\tfloat oa = opaqueTex.a;\n\toa = clamp(oa, 0.0, 1.0);\n\tfloat alpha = diffuseTex.a;\n\tfloat pa = partTex.a;\n\n\t// Who needs built-in blending when you have the power of poor shader design\n\tvec4 result = opaqueTex * oa + vec4(skyColor * (1.0 - oa), 1.0);\n\tresult = vec4(vec3(transparentTex) * alpha + vec3(result) * (1.0 - alpha), 1.0);\n\tgl_FragData[0] = vec4(vec3(partTex) * pa + vec3(result) * (1.0 - pa), 1.0);\n}\n";
+
+	// TODO : Implement
+	var hdrFS = "\nprecision mediump float;\n\nuniform sampler2D tex;\n\nvarying vec2 uv;\n\nvoid main(void)\n{\n\tgl_FragColor = texture2D(tex, uv);\n}\n";
+
+	return {
+		vertexShader: vertexShader,
+		preMaterial: preMaterial,
+		postMaterial: postMaterial,
+		defaultMaterial: defaultMaterial,
+
+		lightVertex: lightVertex,
+		lightPrepass: lightPrepass,
+		lightAmbient: lightAmbient,
+		lightDirectional: lightDirectional,
+		lightPoint: lightPoint,
+
+		particleVS: particleVS,
+		particleFS: particleFS,
+
+		fusionFS: fusionFS,
+		hdrFS: hdrFS
+	};
+}();
+"use strict";
+
 /* eslint-env browser */
 /* globals createjs */
 
@@ -46,6 +107,118 @@ app.AudioPlayer = function (id) {
 };
 
 app.audio = { loadSound: loadSound };
+"use strict";
+
+/* eslint-env browser */
+// All of these functions are in the global scope
+
+// returns mouse position in local coordinate system of element
+window.getMouse = function (e) {
+  var mouse = {}; // make an object
+  mouse.x = e.pageX - e.target.offsetLeft;
+  mouse.y = e.pageY - e.target.offsetTop;
+  return mouse;
+};
+
+window.getRandom = function (min, max) {
+  return Math.random() * (max - min) + min;
+};
+
+window.nextInt = function (i) {
+  return Math.floor(Math.random() * i);
+};
+
+window.makeColor = function (red, green, blue, alpha) {
+  return "rgba(" + red + "," + green + "," + blue + ", " + alpha + ")";
+};
+
+// Function Name: getRandomColor()
+// returns a random color of alpha 1.0
+// http://paulirish.com/2009/random-hex-color-code-snippets/
+window.getRandomColor = function () {
+  var red = Math.round(Math.random() * 200 + 55);
+  var green = Math.round(Math.random() * 200 + 55);
+  var blue = Math.round(Math.random() * 200 + 55);
+  var color = "rgb(" + red + "," + green + "," + blue + ")";
+  // OR	if you want to change alpha
+  // var color='rgba('+red+','+green+','+blue+',0.50)'; // 0.50
+  return color;
+};
+
+window.getRandomUnitVector = function () {
+  var x = window.getRandom(-1, 1);
+  var y = window.getRandom(-1, 1);
+  var length = Math.sqrt(x * x + y * y);
+  if (length === 0) {
+    // very unlikely
+    x = 1; // point right
+    y = 0;
+    length = 1;
+  } else {
+    x /= length;
+    y /= length;
+  }
+
+  return { x: x, y: y };
+};
+
+window.simplePreload = function (imageArray) {
+  // loads images all at once
+  for (var i = 0; i < imageArray.length; i++) {
+    var img = new Image();
+    img.src = imageArray[i];
+  }
+};
+
+window.loadImagesWithCallback = function (sources, callback) {
+  var imageObjects = [];
+  var numImages = sources.length;
+  var numLoadedImages = 0;
+  var func = function func() {
+    numLoadedImages++;
+    // console.log("loaded image at '" + this.src + "'")
+    if (numLoadedImages >= numImages) {
+      callback(imageObjects); // send the images back
+    }
+  };
+
+  for (var i = 0; i < numImages; i++) {
+    imageObjects[i] = new Image();
+    imageObjects[i].onload = func;
+    imageObjects[i].src = sources[i];
+  }
+};
+
+/*
+Function Name: clamp(val, min, max)
+Author: Web - various sources
+Return Value: the constrained value
+Description: returns a value that is
+constrained between min and max (inclusive)
+*/
+window.clamp = function (val, min, max) {
+  return Math.max(min, Math.min(max, val));
+};
+
+// FULL SCREEN MODE
+window.requestFullscreen = function (element) {
+  if (element.requestFullscreen) {
+    element.requestFullscreen();
+  } else if (element.mozRequestFullscreen) {
+    element.mozRequestFullscreen();
+  } else if (element.mozRequestFullScreen) {
+    // camel-cased 'S' was changed to 's' in spec
+    element.mozRequestFullScreen();
+  } else if (element.webkitRequestFullscreen) {
+    element.webkitRequestFullscreen();
+  }
+  // .. and do nothing if the method is not supported
+};
+
+// Thanks Cody-sempai!
+window.lerp = function (v0, v1, alpha) {
+  return (1 - alpha) * v0 + alpha * v1;
+};
 'use strict';
 
 var app = window.app || {};
@@ -2125,7 +2298,7 @@ app.main = app.main || {
       this.graphics.drawText('PAUSED', this.GAME.WIDTH / 2 - 54, this.GAME.HEIGHT / 2 - 9, '18pt "Ubuntu Mono"', '#fff');
     } else if (this.gameState === this.GAME_STATE.DEFAULT) {
       if (this.handleKeyPress) {
-        this.keyCheck(dt);
+        this.keyCheck();
       }
 
       this.graphics.draw(dt);
@@ -2171,16 +2344,11 @@ app.main = app.main || {
 
     this.handleSky();
   },
-  keyCheck: function keyCheck(dt) {
-    var cam = this.graphics.getActiveCamera().transform;
-    var yaw = cam.rotation.elements[1];
+  keyCheck: function keyCheck() {
+    var yaw = this.user.rot.y;
 
-    this.user.prevX = this.user.x;
-    this.user.prevY = this.user.y;
-    this.user.prevZ = this.user.z;
-
-    this.user.prevRotationT = this.user.rotationT;
-    this.user.prevRotationP = this.user.rotationP;
+    this.user.pos.updatePrev();
+    this.user.rot.updatePrev();
 
     if (this.myKeys.keydown[80]) {
       this.musicPaused = true;
@@ -2193,55 +2361,47 @@ app.main = app.main || {
 
     if (this.myKeys.keydown[87]) {
       // forward - w
-      cam.position.elements[0] -= Math.sin(yaw) * 200 * dt;
-      cam.position.elements[2] -= Math.cos(yaw) * 200 * dt;
+      this.user.pos.destX -= Math.sin(yaw) * 2;
+      this.user.pos.destZ -= Math.cos(yaw) * 2;
     }
     if (this.myKeys.keydown[83]) {
       // back - s
-      cam.position.elements[0] += Math.sin(yaw) * 200 * dt;
-      cam.position.elements[2] += Math.cos(yaw) * 200 * dt;
+      this.user.pos.destX += Math.sin(yaw) * 2;
+      this.user.pos.destZ += Math.cos(yaw) * 2;
     }
     if (this.myKeys.keydown[65]) {
       // left - a
-      cam.position.elements[0] -= Math.cos(yaw) * 200 * dt;
-      cam.position.elements[2] += Math.sin(yaw) * 200 * dt;
+      this.user.pos.destX -= Math.cos(yaw) * 2;
+      this.user.pos.destZ += Math.sin(yaw) * 2;
     }
     if (this.myKeys.keydown[68]) {
       // right - d
-      cam.position.elements[0] += Math.cos(yaw) * 200 * dt;
-      cam.position.elements[2] -= Math.sin(yaw) * 200 * dt;
+      this.user.pos.destX += Math.cos(yaw) * 2;
+      this.user.pos.destZ -= Math.sin(yaw) * 2;
     }
     if (this.myKeys.keydown[32] && this.user.onGround) {
       // up - space
-      cam.position.elements[1] += 500 * dt;
+      this.user.pos.destY += 50;
     }
 
     // Inverted up/down
     if (this.myKeys.keydown[38]) {
       // up
-      cam.rotation.elements[0] -= 2 * dt; // look up
+      this.user.rot.destX -= 0.02; // look up
     }
     if (this.myKeys.keydown[40]) {
       // down
-      cam.rotation.elements[0] += 2 * dt; // peer down
+      this.user.rot.destX += 0.02; // peer down
     }
     if (this.myKeys.keydown[37]) {
       // left
-      cam.rotation.elements[1] += 2 * dt; // look left
+      this.user.rot.destY += 0.02; // look left
     }
     if (this.myKeys.keydown[39]) {
       // right
-      cam.rotation.elements[1] -= 2 * dt; // peer right
+      this.user.rot.destY -= 0.02; // peer right
     }
-
-    cam.rotation.elements[0] = window.clamp(cam.rotation.elements[0], -1.5, 1.5);
-
-    this.user.destX = cam.position.elements[0];
-    this.user.destY = cam.position.elements[1];
-    this.user.destZ = cam.position.elements[2];
-
-    this.user.rotationP = cam.rotation.elements[0];
-    this.user.rotationT = cam.rotation.elements[1];
+    this.user.rot.destX = window.clamp(this.user.rot.destX, -1.5, 1.5);
 
     this.user.alpha = 0;
 
@@ -2256,33 +2416,28 @@ app.main = app.main || {
       }
 
       // Lerp position
-      entity.x = window.lerp(entity.prevX, entity.destX, entity.alpha);
-      entity.y = window.lerp(entity.prevY, entity.destY, entity.alpha);
-      entity.z = window.lerp(entity.prevZ, entity.destZ, entity.alpha);
+      entity.pos.lerp(entity.alpha);
+      entity.rot.lerp(entity.alpha);
 
-      var x = -Math.sin(entity.rotationT - 0.4) * 1.5;
-      var z = -Math.cos(entity.rotationT - 0.4) * 1.5;
+      var x = -Math.sin(entity.rot.destY - 0.4) * 1.5;
+      var z = -Math.cos(entity.rot.destY - 0.4) * 1.5;
 
-      var tx = -Math.sin(entity.rotationT - 0.42) * 1.5;
-      var tz = -Math.cos(entity.rotationT - 0.42) * 1.5;
+      var tx = -Math.sin(entity.rot.destY - 0.42) * 1.5;
+      var tz = -Math.cos(entity.rot.destY - 0.42) * 1.5;
 
-      entity.torchParticle.transform.position.elements[0] = x + entity.x;
-      entity.torchParticle.transform.position.elements[1] = entity.y - 0.3;
-      entity.torchParticle.transform.position.elements[2] = z + entity.z;
+      entity.updateMesh();
 
-      entity.torch.transform.position.elements[0] = tx + entity.x;
-      entity.torch.transform.position.elements[1] = entity.y - 0.5;
-      entity.torch.transform.position.elements[2] = tz + entity.z;
+      entity.torchParticle.transform.position.elements[0] = x + entity.pos.x;
+      entity.torchParticle.transform.position.elements[1] = entity.pos.y - 0.3;
+      entity.torchParticle.transform.position.elements[2] = z + entity.pos.z;
+
+      entity.torch.transform.position.elements[0] = tx + entity.pos.x;
+      entity.torch.transform.position.elements[1] = entity.pos.y - 0.5;
+      entity.torch.transform.position.elements[2] = tz + entity.pos.z;
 
       entity.torchLight.position = entity.torch.transform.position;
 
-      entity.torch.transform.rotation.elements[1] = cam.rotation.elements[1];
-
-      if (entity === this.user) {
-        cam.position.elements[0] = entity.x;
-        cam.position.elements[1] = entity.y;
-        cam.position.elements[2] = entity.z;
-      }
+      entity.torch.transform.rotation.elements[1] = entity.rot.destY;
     }
 
     // Emit update
@@ -2290,17 +2445,8 @@ app.main = app.main || {
   },
   getSendingUser: function getSendingUser() {
     return {
-      x: this.user.x,
-      y: this.user.y,
-      z: this.user.z,
-      prevX: this.user.prevX,
-      prevY: this.user.prevY,
-      prevZ: this.user.prevZ,
-      destX: this.user.destX,
-      destY: this.user.destY,
-      destZ: this.user.destZ,
-      rotationT: this.user.rotationT,
-      rotationP: this.user.rotationP,
+      pos: this.user.pos,
+      rot: this.user.rot,
       onGround: this.user.onGround,
       height: this.user.height,
       lastUpdate: this.user.lastUpdate
@@ -2406,6 +2552,20 @@ app.main = app.main || {
     var aMin = (aMinute < 10 ? '0' : '') + aMinute;
     return (theHour < 0 || tMinute < 0 ? '-' : '') + absHour + ':' + aMin;
   },
+  convertVector: function convertVector(input) {
+    var ref = input;
+    ref.updatePrev = function () {
+      ref.prevX = ref.x;
+      ref.prevY = ref.y;
+      ref.prevZ = ref.z;
+    };
+    ref.lerp = function (alpha) {
+      ref.x = window.lerp(ref.prevX, ref.destX, alpha);
+      ref.y = window.lerp(ref.prevY, ref.destY, alpha);
+      ref.z = window.lerp(ref.prevZ, ref.destZ, alpha);
+    };
+    return ref;
+  },
   handleConnection: function handleConnection() {
     var _this = this;
 
@@ -2453,13 +2613,28 @@ app.main = app.main || {
 
       if (!entity) {
         entity = _this.entityList[data.id] = data;
+        entity.pos = _this.convertVector(data.pos);
+        entity.rot = _this.convertVector(data.rot);
 
-        entity.mesh = new MeshRenderable({
-          mesh: 'assets/meshes/cube.obj',
-          position: $V([data.x, data.y, data.z]),
-          scale: data.selfUser ? $V([0, 0, 0]) : $V([1, 1, 1])
-        });
-        entity.mesh.register();
+        if (data.selfUser) {
+          entity.mesh = _this.graphics.getActiveCamera();
+          _this.user = entity;
+        } else {
+          entity.mesh = new MeshRenderable({
+            mesh: 'assets/meshes/cube.obj',
+            position: $V([data.pos.x, data.pos.y, data.pos.z])
+          });
+          entity.mesh.register();
+        }
+
+        entity.updateMesh = function () {
+          entity.mesh.transform.position.elements[0] = entity.pos.x;
+          entity.mesh.transform.position.elements[1] = entity.pos.y;
+          entity.mesh.transform.position.elements[2] = entity.pos.z;
+          entity.mesh.transform.rotation.elements[0] = entity.rot.x;
+          entity.mesh.transform.rotation.elements[1] = entity.rot.y;
+          entity.mesh.transform.rotation.elements[2] = entity.rot.z;
+        };
 
         entity.torchParticle = new ParticleRenderable({});
         entity.torchParticle.register();
@@ -2477,47 +2652,21 @@ app.main = app.main || {
         entity.torchLight = new PointLight({ intensity: $V([0.6, 0.5, 0.3]), radius: 20.0 });
         entity.torchLight.register();
 
-        if (data.selfUser) {
-          _this.user = entity;
-          var cam = _this.graphics.getActiveCamera().transform;
-          cam.position.elements[0] = entity.x;
-          cam.position.elements[1] = entity.y;
-          cam.position.elements[2] = entity.z;
-          cam.rotation.elements[0] = entity.rotationP;
-          cam.rotation.elements[1] = entity.rotationT;
-        }
         return;
       }
+
       if (entity.lastUpdate >= data.lastUpdate) {
         return;
       }
+
       entity.lastUpdate = data.lastUpdate;
-      entity.x = data.x;
-      entity.y = data.y;
-      entity.z = data.z;
-      entity.prevX = data.prevX;
-      entity.prevY = data.prevY;
-      entity.prevZ = data.prevZ;
-      entity.destX = data.destX;
-      entity.destY = data.destY;
-      entity.destZ = data.destZ;
-      entity.rotationT = data.rotationT;
-      entity.rotationP = data.rotationP;
+      entity.pos = _this.convertVector(data.pos);
+      entity.rot = _this.convertVector(data.rot);
       entity.onGround = data.onGround;
       entity.height = data.height;
       entity.alpha = 0;
-      entity.mesh.transform.position.elements[0] = entity.x;
-      entity.mesh.transform.position.elements[1] = entity.y;
-      entity.mesh.transform.position.elements[2] = entity.z;
 
-      if (entity === _this.user) {
-        var _cam = _this.graphics.getActiveCamera().transform;
-        _cam.position.elements[0] = entity.x;
-        _cam.position.elements[1] = entity.y;
-        _cam.position.elements[2] = entity.z;
-        _cam.rotation.elements[0] = entity.rotationP;
-        _cam.rotation.elements[1] = entity.rotationT;
-      }
+      entity.updateMesh();
     });
 
     this.genWorker.on('heightCorrection', function (data) {
@@ -2531,182 +2680,9 @@ app.main = app.main || {
       _this.entityList[data.id].torch.unregister();
       _this.entityList[data.id].torchParticle.unregister();
       _this.entityList[data.id].torchLight.unregister();
-      delete _this.entityList[data.id];
+      _this.entityList[data.id] = {};
     });
 
     this.genWorker.emit('join', { name: 'Player' + Math.floor(Math.random() * 100) });
   }
-};
-"use strict";
-
-var app = app || {};
-
-app.shaders = function () {
-	// Manipulates the vertices and sets up for the material shader
-	var vertexShader = "\nattribute vec3 vpos;\nattribute vec2 vtex;\nattribute vec3 vnor;\n\nuniform mat4 world;\nuniform mat4 persp;\n\nvarying vec3 pos;\nvarying vec2 uv;\nvarying vec3 norm;\n\nvoid main(void)\n{\n\tpos = vec3(world * vec4(vpos, 1.0));\n\tuv = vtex;\n\tnorm = normalize(vec3(world * vec4(vnor, 0.0)));\n\n\tgl_Position = persp * world * vec4(vpos, 1.0);\n}\n";
-
-	// Sets the shader up for the material calculation
-	var preMaterial = "\n#extension GL_EXT_draw_buffers : require\nprecision mediump float;\n\nvarying vec3 pos;\nvarying vec2 uv;\nvarying vec3 norm;\n\nvec3 diffuse = vec3(0.5);\nvec3 normal = vec3(0.0, 0.0, 1.0);\nvec3 specular = vec3(0.5);\nvec3 emission = vec3(0.0);\nfloat roughness = 0.5;\nfloat opacity = 1.0;\n";
-
-	// Interprets the results of the material
-	var postMaterial = "\nuniform vec4 camPos;\n\n// float fogStart = 64.0;\n// float fogEnd = 80.0;\n\nvoid main(void)\n{\n\tmaterial();\n\n\n\t// float dist = length(vec3(camPos) - pos);\n\t// float fog = (dist - fogStart) / (fogEnd - fogStart);\n\t// fog = clamp(fog, 0.0, 1.0);\n\n\n\tgl_FragData[0] = vec4(diffuse, opacity);\n\n\tgl_FragData[1] = vec4(norm, 0.0);\n\n\tgl_FragData[2] = vec4(specular, roughness);\n\n\tgl_FragData[3] = vec4(emission, 1.0);\n\n\tgl_FragData[4] = vec4(pos, 1.0);\n}\n";
-
-	// Creates the material function which serves as the "meat" of the material
-	var defaultMaterial = "\nuniform sampler2D diffuseTexture;\nuniform sampler2D specularTexture;\nuniform sampler2D emissionTexture;\n\nvoid material(void)\n{\n\tvec4 dTex = texture2D(diffuseTexture, uv);\n\tvec4 sTex = texture2D(specularTexture, uv);\n\tvec4 eTex = texture2D(emissionTexture, uv);\n\n\n\tdiffuse = dTex.rgb;\n\topacity = dTex.a;\n\tspecular = sTex.rgb;\n\troughness = sTex.a;\n\temission = eTex.rgb;\n}\n";
-
-	// Simple vertex shader for lights
-	var lightVertex = "\nattribute vec3 vpos;\n\nvarying vec2 uv;\n\nvoid main(void)\n{\n\tuv = vec2((vpos + vec3(1.0)) / 2.0);\n\tgl_Position = vec4(vpos, 1.0);\n}\n";
-
-	// Sets the emission value
-	var lightPrepass = "\nprecision mediump float;\n\nuniform sampler2D emission;\n\nvarying vec2 uv;\n\nvoid main(void)\n{\n\tgl_FragData[0] = texture2D(emission, uv);\n}\n";
-
-	// Ambient light pass
-	var lightAmbient = "\nprecision mediump float;\n\nuniform sampler2D diffuse;\n\nuniform vec4 intensity;\n\nvarying vec2 uv;\n\nvoid main(void)\n{\n\tvec4 dtex = texture2D(diffuse, uv);\n\tgl_FragData[0] = vec4(intensity.rgb * dtex.rgb, dtex.a);\n}\n";
-
-	var lightDirectional = "\nprecision mediump float;\n\nuniform sampler2D diffuse;\nuniform sampler2D normal;\nuniform sampler2D specular;\nuniform sampler2D position;\n\nuniform vec4 direction;\nuniform vec4 intensity;\nuniform vec4 camPos;\n\nvarying vec2 uv;\n\nvoid main(void)\n{\n\tvec3 opDir = -vec3(direction);\n\n\tvec4 dtex = texture2D(diffuse, uv);\n\n\t// DIFFUSE\n\n\tvec3 normTex = texture2D(normal, uv).rgb;\n\tfloat diff = max(dot(normTex, opDir), 0.0);\n\tvec3 diffuseIntensity = (intensity * diff).rgb * dtex.rgb;\n\n\t// SPECULAR\n\n\tvec3 fragPos = texture2D(position, uv).rgb;\n\tvec3 viewDir = normalize(vec3(camPos) - fragPos);\n\tvec3 reflectDir = reflect(vec3(direction), normTex);\n\tvec4 specTex = texture2D(specular, uv);\n\tfloat spec = pow(max(dot(viewDir, reflectDir), 0.0), 2.0 / max(specTex.a * specTex.a, 0.01));\n\tvec3 specularIntensity = (intensity.rgb * spec) * specTex.rgb;\n\n\tgl_FragData[0] = vec4(diffuseIntensity + specularIntensity, dtex.a);\n}\n";
-
-	var lightPoint = "\nprecision mediump float;\n\nuniform sampler2D diffuse;\nuniform sampler2D normal;\nuniform sampler2D specular;\nuniform sampler2D position;\n\nuniform vec4 lightPos;\nuniform vec4 intensity;\nuniform vec4 camPos;\nuniform float radius;\n\nvarying vec2 uv;\n\nvoid main(void)\n{\n\tvec3 fragPos = texture2D(position, uv).rgb;\n\n\tfloat dist = length(fragPos - vec3(lightPos));\n\tfloat power = max(1.0 - (dist / radius), 0.0);\n\n\tvec3 direction = normalize(fragPos - vec3(lightPos));\n\tvec3 opDir = -vec3(direction);\n\n\tvec4 dtex = texture2D(diffuse, uv);\n\n\t// DIFFUSE\n\n\tvec3 normTex = texture2D(normal, uv).rgb;\n\tfloat diff = max(dot(normTex, opDir), 0.0);\n\tvec3 diffuseIntensity = (intensity * diff).rgb * dtex.rgb;\n\n\t// SPECULAR\n\n\tvec3 viewDir = normalize(vec3(camPos) - fragPos);\n\tvec3 reflectDir = reflect(vec3(direction), normTex);\n\tvec4 specTex = texture2D(specular, uv);\n\tfloat spec = pow(max(dot(viewDir, reflectDir), 0.0), 2.0 / max(specTex.a * specTex.a, 0.01));\n\tvec3 specularIntensity = (intensity.rgb * spec) * specTex.rgb;\n\n\tgl_FragData[0] = vec4((diffuseIntensity + specularIntensity) * power, dtex.a);\n}\n";
-
-	// Renders particles
-	var particleVS = "\nattribute vec3 vpos;\n\nuniform mat4 cam;\nuniform mat4 persp;\n\nuniform vec4 pos;\nuniform vec2 scale;\n\nvarying vec2 uv;\nvarying vec3 newPos;\n\nvoid main(void)\n{\n\tuv = vec2((vpos + vec3(1.0)) / 2.0);\n\n\tvec3 vertPos = vec3((vpos.xy * scale.xy) * 0.1, vpos.z);\n\n\tnewPos = pos.xyz;\n\n\tvec3 tempPos = vec3(cam * pos);\n\ttempPos += vertPos;\n\n\tvec4 finalPos = persp * vec4(tempPos, 1.0);\n\n\tgl_Position = finalPos;\n}\n";
-
-	// Also renders particles
-	var particleFS = "\nprecision mediump float;\n\nuniform sampler2D texture;\nuniform sampler2D oldPos;\n\nuniform vec3 camPos;\nuniform vec2 screenSize;\n\nvarying vec2 uv;\nvarying vec3 newPos;\n\n// Get the length-squared, as it is faster\nfloat lsq(vec3 vector)\n{\n\treturn (vector.x * vector.x + vector.y * vector.y + vector.z * vector.z);\n}\n\nvoid main(void)\n{\n\tvec2 screenUV = gl_FragCoord.xy / screenSize;\n\n\tvec4 tex = texture2D(texture, uv);\n\tvec3 posTex = texture2D(oldPos, screenUV).xyz;\n\n\tfloat oldDist = lsq(posTex - camPos);\n\tfloat newDist = lsq(newPos - camPos);\n\n\tif (newDist > oldDist) { discard; }\n\n\tgl_FragData[0] = tex;\n}\n";
-
-	// Fuses the opaque and transparent framebuffers
-	var fusionFS = "\nprecision mediump float;\n\nuniform sampler2D opaque;\nuniform sampler2D transparent;\nuniform sampler2D diffuse;\nuniform sampler2D particle;\n\nuniform vec3 skyColor;\n\nvarying vec2 uv;\n\nvoid main(void)\n{\n\tvec4 opaqueTex = texture2D(opaque, uv);\n\tvec4 transparentTex = texture2D(transparent, uv);\n\tvec4 diffuseTex = texture2D(diffuse, uv);\n\tvec4 partTex = texture2D(particle, uv);\n\n\tfloat oa = opaqueTex.a;\n\toa = clamp(oa, 0.0, 1.0);\n\tfloat alpha = diffuseTex.a;\n\tfloat pa = partTex.a;\n\n\t// Who needs built-in blending when you have the power of poor shader design\n\tvec4 result = opaqueTex * oa + vec4(skyColor * (1.0 - oa), 1.0);\n\tresult = vec4(vec3(transparentTex) * alpha + vec3(result) * (1.0 - alpha), 1.0);\n\tgl_FragData[0] = vec4(vec3(partTex) * pa + vec3(result) * (1.0 - pa), 1.0);\n}\n";
-
-	// TODO : Implement
-	var hdrFS = "\nprecision mediump float;\n\nuniform sampler2D tex;\n\nvarying vec2 uv;\n\nvoid main(void)\n{\n\tgl_FragColor = texture2D(tex, uv);\n}\n";
-
-	return {
-		vertexShader: vertexShader,
-		preMaterial: preMaterial,
-		postMaterial: postMaterial,
-		defaultMaterial: defaultMaterial,
-
-		lightVertex: lightVertex,
-		lightPrepass: lightPrepass,
-		lightAmbient: lightAmbient,
-		lightDirectional: lightDirectional,
-		lightPoint: lightPoint,
-
-		particleVS: particleVS,
-		particleFS: particleFS,
-
-		fusionFS: fusionFS,
-		hdrFS: hdrFS
-	};
-}();
-"use strict";
-
-/* eslint-env browser */
-// All of these functions are in the global scope
-
-// returns mouse position in local coordinate system of element
-window.getMouse = function (e) {
-  var mouse = {}; // make an object
-  mouse.x = e.pageX - e.target.offsetLeft;
-  mouse.y = e.pageY - e.target.offsetTop;
-  return mouse;
-};
-
-window.getRandom = function (min, max) {
-  return Math.random() * (max - min) + min;
-};
-
-window.nextInt = function (i) {
-  return Math.floor(Math.random() * i);
-};
-
-window.makeColor = function (red, green, blue, alpha) {
-  return "rgba(" + red + "," + green + "," + blue + ", " + alpha + ")";
-};
-
-// Function Name: getRandomColor()
-// returns a random color of alpha 1.0
-// http://paulirish.com/2009/random-hex-color-code-snippets/
-window.getRandomColor = function () {
-  var red = Math.round(Math.random() * 200 + 55);
-  var green = Math.round(Math.random() * 200 + 55);
-  var blue = Math.round(Math.random() * 200 + 55);
-  var color = "rgb(" + red + "," + green + "," + blue + ")";
-  // OR	if you want to change alpha
-  // var color='rgba('+red+','+green+','+blue+',0.50)'; // 0.50
-  return color;
-};
-
-window.getRandomUnitVector = function () {
-  var x = window.getRandom(-1, 1);
-  var y = window.getRandom(-1, 1);
-  var length = Math.sqrt(x * x + y * y);
-  if (length === 0) {
-    // very unlikely
-    x = 1; // point right
-    y = 0;
-    length = 1;
-  } else {
-    x /= length;
-    y /= length;
-  }
-
-  return { x: x, y: y };
-};
-
-window.simplePreload = function (imageArray) {
-  // loads images all at once
-  for (var i = 0; i < imageArray.length; i++) {
-    var img = new Image();
-    img.src = imageArray[i];
-  }
-};
-
-window.loadImagesWithCallback = function (sources, callback) {
-  var imageObjects = [];
-  var numImages = sources.length;
-  var numLoadedImages = 0;
-  var func = function func() {
-    numLoadedImages++;
-    // console.log("loaded image at '" + this.src + "'")
-    if (numLoadedImages >= numImages) {
-      callback(imageObjects); // send the images back
-    }
-  };
-
-  for (var i = 0; i < numImages; i++) {
-    imageObjects[i] = new Image();
-    imageObjects[i].onload = func;
-    imageObjects[i].src = sources[i];
-  }
-};
-
-/*
-Function Name: clamp(val, min, max)
-Author: Web - various sources
-Return Value: the constrained value
-Description: returns a value that is
-constrained between min and max (inclusive)
-*/
-window.clamp = function (val, min, max) {
-  return Math.max(min, Math.min(max, val));
-};
-
-// FULL SCREEN MODE
-window.requestFullscreen = function (element) {
-  if (element.requestFullscreen) {
-    element.requestFullscreen();
-  } else if (element.mozRequestFullscreen) {
-    element.mozRequestFullscreen();
-  } else if (element.mozRequestFullScreen) {
-    // camel-cased 'S' was changed to 's' in spec
-    element.mozRequestFullScreen();
-  } else if (element.webkitRequestFullscreen) {
-    element.webkitRequestFullscreen();
-  }
-  // .. and do nothing if the method is not supported
-};
-
-// Thanks Cody-sempai!
-window.lerp = function (v0, v1, alpha) {
-  return (1 - alpha) * v0 + alpha * v1;
 };

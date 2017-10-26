@@ -82,7 +82,7 @@ const makeArr = () => {
 const makeChunk = (i, j) => {
   const chunk = [];
   const heightMap = [];
-  const get = (x, y, z) => chunk[y].get(x, z);
+  const get = (x, y, z) => { return chunk[y] ? chunk[y].get(x, z) : undefined; };
   const set = (x, y, z, v) => { chunk[y].set(x, z, v); };
   const globalX = x => (i << 4) + x;
   const globalZ = z => (j << 4) + z;

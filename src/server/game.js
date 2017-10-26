@@ -103,6 +103,21 @@ const generateWorld = () => {
   latestGenData = returnObject();
 };
 
+const makeFakeVector = (x, y, z) => {
+  const e = {
+    x,
+    y,
+    z,
+    prevX: x,
+    prevY: y,
+    prevZ: z,
+    destX: x,
+    destY: y,
+    destZ: z,
+  };
+  return e;
+};
+
 const makeEntity = (name) => {
   const centerX = worldGen.WORLD_SIZE / 2 + worldGen.nextInt(6) - 3;
   const centerZ = worldGen.WORLD_SIZE / 2 + worldGen.nextInt(6) - 3;
@@ -111,18 +126,9 @@ const makeEntity = (name) => {
     name,
     id: xxh.h32(`${entityId++}${Date.now()}`, 0xCAFEBABE).toString(16),
     lastUpdate: new Date().getTime(),
-    x: centerX,
-    y: centerY,
-    z: centerZ,
-    prevX: centerX,
-    prevY: centerY,
-    prevZ: centerZ,
-    destX: centerX,
-    destY: centerY,
-    destZ: centerZ,
-    rotationP: -0.2,
-    rotationT: 0,
-    onGround: true,
+    pos: makeFakeVector(centerX, centerY, centerZ),
+    rot: makeFakeVector(-0.2, 0, 0),
+    onGround: false,
   };
   return e;
 };
@@ -181,31 +187,23 @@ const startSocketServer = (io) => {
       }
 
       // Height check
-      const floorX = Math.floor(data.x); const floorZ = Math.floor(data.z);
+      const floorX = Math.floor(data.pos.x); const floorZ = Math.floor(data.pos.z);
       const height = world.height(floorX, floorZ) + 3;
-      const shiftY = Math.max(height, data.y);
-      const block = world.get(floorX, Math.floor(shiftY - 3), floorZ);
-      let gravity = 0.04905;
+      const shiftY = Math.max(height, data.pos.y);
+      const block = world.get(floorX, Math.floor(shiftY - 3), floorZ) || worldGen.TYPES.air;
+      let gravity = 0.4905;
       if (block === worldGen.TYPES.water) {
         gravity *= 0.5; // Fall slower in water
       }
 
-      player.x = data.x;
-      player.y = shiftY - gravity;
-      player.z = data.z;
-      player.prevX = data.prevX;
-      player.prevY = data.prevY;
-      player.prevZ = data.prevZ;
-      player.destX = data.destX;
-      player.destY = data.destY;
-      player.destZ = data.destZ;
-      player.rotationP = data.rotationP;
-      player.rotationT = data.rotationT;
+      player.pos = data.pos;
+      player.pos.y = shiftY - gravity;
+      player.pos.destY = shiftY - gravity;
+      player.rot = data.rot;
       player.lastUpdate = new Date().getTime();
       player.onGround = block !== worldGen.TYPES.air;
       player.height = height;
-      socket.broadcast.emit('update', player);
-      socket.emit('heightCorrection', { y: player.y, h: height, g: player.onGround });
+      io.emit('update', player);
     });
   });
 
