@@ -193,7 +193,7 @@ app.main = app.main || {
       this.worldTime = 0;
       this.musicPlayer.pause();
       if (this.chunkMeshData.length > 0) {
-        const mesh = this.chunkMeshData[this.chunkMeshData.length-1];
+        const mesh = this.chunkMeshData[this.chunkMeshData.length - 1];
         mesh.unregister();
         this.graphics.freeMesh(mesh.mesh);
         this.chunkMeshData.pop();

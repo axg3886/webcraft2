@@ -204,7 +204,11 @@ const startSocketServer = (io) => {
       player.lastUpdate = new Date().getTime();
       player.onGround = block !== worldGen.TYPES.air;
       player.height = height;
-      io.emit('update', player);
+      if (player.y !== data.y) {
+        io.emit('update', player);
+      } else {
+        socket.broadcast.emit('update', player);
+      }
     });
   });
 
