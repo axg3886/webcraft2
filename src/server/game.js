@@ -174,6 +174,7 @@ const startSocketServer = (io) => {
     socket.on('disconnect', () => {
       const player = entityList[socket.playerId];
       if (player) {
+        console.log(`Disconnected: ${player.id}`);
         io.emit('kill', { id: player.id });
         delete entityList[player.id];
       }

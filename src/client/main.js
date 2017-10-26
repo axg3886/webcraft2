@@ -281,6 +281,10 @@ app.main = app.main || {
     for (let i = 0; i < keys.length; i++) {
       const entity = this.entityList[keys[i]];
 
+      if (!entity.pos) {
+        continue;
+      }
+
       // Update alpha
       if (entity.alpha < 1) {
         entity.alpha += 0.05;
@@ -558,6 +562,7 @@ app.main = app.main || {
       this.entityList[data.id].torch.unregister();
       this.entityList[data.id].torchParticle.unregister();
       this.entityList[data.id].torchLight.unregister();
+      this.graphics.unregisterRenderable(this.entityList[data.id].mesh);
       this.entityList[data.id] = {};
     });
 
