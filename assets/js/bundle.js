@@ -681,7 +681,7 @@ app.graphics = function () {
       radius: gl.getUniformLocation(pointShader, 'radius')
     };
 
-    console.log('compilation error : ' + gl.getShaderInfoLog(point));
+    // console.log(`compilation error : ${gl.getShaderInfoLog(point)}`);
 
     // Fusion pass fragment shader
     var fusionSource = app.shaders.fusionFS;
@@ -1836,7 +1836,7 @@ app.graphics = function () {
 
     // Boy howdy, look at them numbers
     // We got some real number crunchin' goin' on right here, we do
-    for (var _i10 = 0; _i10 < faces.length; ++_i10) {
+    for (var _i10 = 0; _i10 < faces.length / 3; ++_i10) {
       face = faces[_i10 * 3 + 0];
       dataBuffer[_i10 * 3 + 0 + vpStart] = vp[face * 3 + 0];
       dataBuffer[_i10 * 3 + 1 + vpStart] = vp[face * 3 + 1];
@@ -2333,6 +2333,8 @@ app.main = app.main || {
       if (this.user) {
         this.graphics.drawText('g : ' + this.user.onGround, 8, 56, '10pt "Ubuntu Mono"', '#A0A0A0');
         this.graphics.drawText('h : ' + this.user.height, 8, 68, '10pt "Ubuntu Mono"', '#A0A0A0');
+        this.graphics.drawText('cx : ' + (pos[0] >> 4), 8, 80, '10pt "Ubuntu Mono"', '#A0A0A0');
+        this.graphics.drawText('cz : ' + (pos[2] >> 4), 8, 92, '10pt "Ubuntu Mono"', '#A0A0A0');
       }
       // Draw rtime in top right corner
       this.graphics.drawText(this.readableTime(), this.GAME.WIDTH - 60, 20, '10pt "Ubuntu Mono"', '#A0A0A0');

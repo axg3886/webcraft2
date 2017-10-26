@@ -209,6 +209,8 @@ app.main = app.main || {
       if (this.user) {
         this.graphics.drawText(`g : ${this.user.onGround}`, 8, 56, '10pt "Ubuntu Mono"', '#A0A0A0');
         this.graphics.drawText(`h : ${this.user.height}`, 8, 68, '10pt "Ubuntu Mono"', '#A0A0A0');
+        this.graphics.drawText(`cx : ${pos[0] >> 4}`, 8, 80, '10pt "Ubuntu Mono"', '#A0A0A0');
+        this.graphics.drawText(`cz : ${pos[2] >> 4}`, 8, 92, '10pt "Ubuntu Mono"', '#A0A0A0');
       }
         // Draw rtime in top right corner
       this.graphics.drawText(this.readableTime(),

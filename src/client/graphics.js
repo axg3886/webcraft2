@@ -484,7 +484,7 @@ app.graphics = (function () {
       radius: gl.getUniformLocation(pointShader, 'radius'),
     };
 
-    console.log(`compilation error : ${gl.getShaderInfoLog(point)}`);
+    // console.log(`compilation error : ${gl.getShaderInfoLog(point)}`);
 
 		// Fusion pass fragment shader
     const fusionSource = app.shaders.fusionFS;
@@ -1620,7 +1620,7 @@ app.graphics = (function () {
 
 		// Boy howdy, look at them numbers
 		// We got some real number crunchin' goin' on right here, we do
-    for (let i = 0; i < faces.length; ++i) {
+    for (let i = 0; i < faces.length / 3; ++i) {
       face = faces[i * 3 + 0];
       dataBuffer[i * 3 + 0 + vpStart] = (vp[face * 3 + 0]);
       dataBuffer[i * 3 + 1 + vpStart] = (vp[face * 3 + 1]);
