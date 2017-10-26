@@ -284,6 +284,8 @@ app.main = app.main || {
     this.user.destY = cam.position.elements[1];
     this.user.destZ = cam.position.elements[2];
 
+    this.user.destY = Math.max(this.user.height, this.user.destY) - 0.04905;
+
     this.user.rotationP = cam.rotation.elements[0];
     this.user.rotationT = cam.rotation.elements[1];
 

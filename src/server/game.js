@@ -184,11 +184,8 @@ const startSocketServer = (io) => {
       const floorX = Math.floor(data.x); const floorZ = Math.floor(data.z);
       const height = world.height(floorX, floorZ) + 3;
       const shiftY = Math.max(height, data.y);
+      const gravity = 0.04905;
       const block = world.get(floorX, Math.floor(shiftY - 3), floorZ);
-      let gravity = 0.04905;
-      if (block === worldGen.TYPES.water) {
-        gravity *= 0.5; // Fall slower in water
-      }
 
       player.x = data.x;
       player.y = shiftY - gravity;
@@ -204,11 +201,7 @@ const startSocketServer = (io) => {
       player.lastUpdate = new Date().getTime();
       player.onGround = block !== worldGen.TYPES.air;
       player.height = height;
-      if (player.y !== data.y) {
-        io.emit('update', player);
-      } else {
-        socket.broadcast.emit('update', player);
-      }
+      socket.broadcast.emit('update', player);
     });
   });
 
