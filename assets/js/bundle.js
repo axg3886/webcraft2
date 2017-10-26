@@ -2240,7 +2240,7 @@ app.main = app.main || {
     this.user.destY = cam.position.elements[1];
     this.user.destZ = cam.position.elements[2];
 
-    this.user.destY = Math.max(this.user.height, this.user.destY) - 0.04905;
+    //this.user.destY = Math.max(this.user.height, this.user.destY) - 0.04905;
 
     this.user.rotationP = cam.rotation.elements[0];
     this.user.rotationT = cam.rotation.elements[1];
@@ -2520,6 +2520,11 @@ app.main = app.main || {
         _cam.rotation.elements[0] = entity.rotationP;
         _cam.rotation.elements[1] = entity.rotationT;
       }
+    });
+
+    this.genWorker.on('heightCorrection', function (data) {
+      _this.user.y = data.y;
+      _this.user.height = data.h;
     });
 
     this.genWorker.on('kill', function (data) {
