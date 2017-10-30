@@ -17,9 +17,10 @@
   ],
   "license": "ISC",
   "dependencies": {
+    "express": "^4.15.2",
     "socket.io": "^1.4.8",
-    "xxhashjs": "^0.2.1",
-    "express": "^4.15.2"
+    "sqlite3": "^3.1.13",
+    "xxhashjs": "^0.2.1"
   },
   "devDependencies": {
     "babel-cli": "^6.26.0",

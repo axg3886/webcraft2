@@ -72,7 +72,6 @@ const generateWorld = () => {
       }
       genAmount++;
     } else {
-      world.recalcHeight();
       genAmount = 0;
       genMax = world.length;
       genState = GEN_STATE.MESH;
@@ -96,7 +95,6 @@ const generateWorld = () => {
     if (genAmount >= genMax) {
       genState = GEN_STATE.END;
       console.log(genState);
-      world.recalcHeight();
     }
   }
   // Update message
