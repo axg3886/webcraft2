@@ -52,7 +52,7 @@ const genTypes = [];
 
 const CHUNK_SIZE = 16;
 const CHUNK_HEIGHT = 128;
-const NUM_CHUNKS = 16;
+const NUM_CHUNKS = 8;
 const WORLD_SIZE = NUM_CHUNKS * CHUNK_SIZE;
 const SEA_LEVEL = 50;
 
