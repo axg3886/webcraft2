@@ -189,27 +189,78 @@ const startSocketServer = (io) => {
 
       // Height check
       const pos = data.pos;
-      const floorX = Math.floor(pos.x);
-      const floorY = Math.floor(pos.y);
-      const floorZ = Math.floor(pos.z);
-      const block = world.get(floorX, floorY, floorZ) || worldGen.TYPES.air;
+
+      const posCheck = (x, y, z) => {
+        const floorX = Math.floor(x);
+        const floorY = Math.floor(y);
+        const floorZ = Math.floor(z);
+        return world.get(floorX, floorY, floorZ) || worldGen.TYPES.air;
+      };
+
       let gravity = 0.4905;
-      if (block === worldGen.TYPES.water) {
+      if (posCheck(pos.x, pos.y, pos.z) === worldGen.TYPES.water) {
         gravity *= 0.5; // Fall slower in water
       }
-      if (worldGen.TYPE_OPAQUE[block]) {
-        pos.y = floorY;
-        pos.destY = floorY;
-      } else {
-        pos.y -= gravity;
-        pos.destY -= gravity;
-      }
-      pos.y = Math.max(0, pos.y);
+      pos.y -= gravity;
+      pos.destY -= gravity;
 
+      if (worldGen.TYPE_OPAQUE[posCheck(pos.x - 0.25, pos.y, pos.z)]) {
+        if (worldGen.TYPE_OPAQUE[posCheck(pos.x - 0.25, pos.y + 1, pos.z)]) {
+          pos.x = player.pos.x;
+          pos.destX = player.pos.destX;
+        } else {
+          pos.y += 0.5;
+          pos.destY += 0.5;
+        }
+      }
+      if (worldGen.TYPE_OPAQUE[posCheck(pos.x + 0.25, pos.y, pos.z)]) {
+        if (worldGen.TYPE_OPAQUE[posCheck(pos.x + 0.25, pos.y + 1, pos.z)]) {
+          pos.x = player.pos.x;
+          pos.destX = player.pos.destX;
+        } else {
+          pos.y += 0.5;
+          pos.destY += 0.5;
+        }
+      }
+      if (worldGen.TYPE_OPAQUE[posCheck(pos.x, pos.y, pos.z - 0.25)]) {
+        if (worldGen.TYPE_OPAQUE[posCheck(pos.x, pos.y + 1, pos.z - 0.25)]) {
+          pos.z = player.pos.z;
+          pos.destZ = player.pos.destZ;
+        } else {
+          pos.y += 0.25;
+          pos.destY += 0.25;
+        }
+      }
+      if (worldGen.TYPE_OPAQUE[posCheck(pos.x, pos.y, pos.z + 0.25)]) {
+        if (worldGen.TYPE_OPAQUE[posCheck(pos.x, pos.y + 1, pos.z + 0.25)]) {
+          pos.z = player.pos.z;
+          pos.destZ = player.pos.destZ;
+        } else {
+          pos.y += 0.5;
+          pos.destY += 0.5;
+        }
+      }
+
+      if (worldGen.TYPE_OPAQUE[posCheck(pos.x, pos.y - 0.25, pos.z)]) {
+        pos.y = player.pos.y;
+        pos.destY = player.pos.destY;
+      }
+      if (worldGen.TYPE_OPAQUE[posCheck(pos.x, pos.y + 0.25, pos.z)]) {
+        pos.y = player.pos.y;
+        pos.destY = player.pos.destY;
+      }
+
+      pos.x = Math.max(1, Math.min(worldGen.WORLD_SIZE - 1, pos.x));
+      pos.y = Math.max(-2, Math.min(worldGen.CHUNK_HEIGHT, pos.y));
+      pos.z = Math.max(1, Math.min(worldGen.WORLD_SIZE - 1, pos.z));
+      pos.destX = Math.max(1, Math.min(worldGen.WORLD_SIZE - 1, pos.destX));
+      pos.destY = Math.max(-2, Math.min(worldGen.CHUNK_HEIGHT, pos.destY));
+      pos.destZ = Math.max(1, Math.min(worldGen.WORLD_SIZE - 1, pos.destZ));
+
+      player.onGround = pos.y === player.pos.y || pos.y <= 0;
       player.pos = pos;
       player.rot = data.rot;
       player.lastUpdate = new Date().getTime();
-      player.onGround = worldGen.TYPE_OPAQUE[block] || pos.y <= 0;
       io.emit('update', player);
     });
   });

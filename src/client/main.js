@@ -314,9 +314,9 @@ app.main = app.main || {
 
       entity.torch.transform.rotation.elements[1] = entity.rot.destY;
     }
-    this.user.mesh.transform.position.elements[1] += 3;
-    this.user.torchParticle.transform.position.elements[1] += 3;
-    this.user.torch.transform.position.elements[1] += 3;
+    this.user.mesh.transform.position.elements[1] += 2;
+    this.user.torchParticle.transform.position.elements[1] += 2;
+    this.user.torch.transform.position.elements[1] += 2;
 
     // Emit update
     this.genWorker.emit('movement', this.getSendingUser());
