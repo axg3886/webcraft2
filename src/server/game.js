@@ -201,7 +201,6 @@ const startSocketServer = (io) => {
       if (posCheck(pos.x, pos.y, pos.z) === worldGen.TYPES.water) {
         gravity *= 0.5; // Fall slower in water
       }
-      pos.y -= gravity;
       pos.destY -= gravity;
 
       if (worldGen.TYPE_OPAQUE[posCheck(pos.x - 0.25, pos.y, pos.z)]) {
@@ -261,7 +260,7 @@ const startSocketServer = (io) => {
       player.pos = pos;
       player.rot = data.rot;
       player.lastUpdate = new Date().getTime();
-      io.emit('update', player);
+      setInterval(() => io.emit('update', player), 5000);
     });
   });
 
