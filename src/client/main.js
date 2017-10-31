@@ -319,7 +319,6 @@ app.main = app.main || {
     this.user.torch.transform.position.elements[1] += 2;
 
     // Emit update
-    this.user.lastUpdate = new Date().getTime();
     this.genWorker.emit('movement', this.getSendingUser());
   },
 
