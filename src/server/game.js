@@ -188,22 +188,28 @@ const startSocketServer = (io) => {
       }
 
       // Height check
-      const floorX = Math.floor(data.pos.x); const floorZ = Math.floor(data.pos.z);
-      const height = world.height(floorX, floorZ) + 3;
-      const shiftY = Math.max(height, data.pos.y);
-      const block = world.get(floorX, Math.floor(shiftY - 3), floorZ) || worldGen.TYPES.air;
+      const pos = data.pos;
+      const floorX = Math.floor(pos.x);
+      const floorY = Math.floor(pos.y);
+      const floorZ = Math.floor(pos.z);
+      const block = world.get(floorX, floorY, floorZ) || worldGen.TYPES.air;
       let gravity = 0.4905;
       if (block === worldGen.TYPES.water) {
         gravity *= 0.5; // Fall slower in water
       }
+      if (worldGen.TYPE_OPAQUE[block]) {
+        pos.y = floorY;
+        pos.destY = floorY;
+      } else {
+        pos.y -= gravity;
+        pos.destY -= gravity;
+      }
+      pos.y = Math.max(0, pos.y);
 
-      player.pos = data.pos;
-      player.pos.y = shiftY - gravity;
-      player.pos.destY = shiftY - gravity;
+      player.pos = pos;
       player.rot = data.rot;
       player.lastUpdate = new Date().getTime();
-      player.onGround = block !== worldGen.TYPES.air;
-      player.height = height;
+      player.onGround = worldGen.TYPE_OPAQUE[block] || pos.y <= 0;
       io.emit('update', player);
     });
   });

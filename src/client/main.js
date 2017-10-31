@@ -208,9 +208,6 @@ app.main = app.main || {
       this.graphics.drawText(`z : ${(pos[2]).toFixed(1)}`, 8, 44, '10pt "Ubuntu Mono"', '#A0A0A0');
       if (this.user) {
         this.graphics.drawText(`g : ${this.user.onGround}`, 8, 56, '10pt "Ubuntu Mono"', '#A0A0A0');
-        this.graphics.drawText(`h : ${this.user.height}`, 8, 68, '10pt "Ubuntu Mono"', '#A0A0A0');
-        this.graphics.drawText(`cx : ${pos[0] >> 4}`, 8, 80, '10pt "Ubuntu Mono"', '#A0A0A0');
-        this.graphics.drawText(`cz : ${pos[2] >> 4}`, 8, 92, '10pt "Ubuntu Mono"', '#A0A0A0');
       }
         // Draw rtime in top right corner
       this.graphics.drawText(this.readableTime(),
@@ -294,6 +291,7 @@ app.main = app.main || {
 
       // Lerp position
       entity.pos.lerp(entity.alpha);
+      entity.pos.y = Math.max(0, entity.pos.y);
       entity.rot.lerp(entity.alpha);
 
       const x = -Math.sin(entity.rot.destY - 0.4) * 1.5;
@@ -316,6 +314,9 @@ app.main = app.main || {
 
       entity.torch.transform.rotation.elements[1] = entity.rot.destY;
     }
+    this.user.mesh.transform.position.elements[1] += 3;
+    this.user.torchParticle.transform.position.elements[1] += 3;
+    this.user.torch.transform.position.elements[1] += 3;
 
     // Emit update
     this.genWorker.emit('movement', this.getSendingUser());
@@ -326,7 +327,6 @@ app.main = app.main || {
       pos: this.user.pos,
       rot: this.user.rot,
       onGround: this.user.onGround,
-      height: this.user.height,
       lastUpdate: this.user.lastUpdate,
     };
   },
@@ -547,16 +547,9 @@ app.main = app.main || {
       entity.pos = this.convertVector(data.pos);
       entity.rot = this.convertVector(data.rot);
       entity.onGround = data.onGround;
-      entity.height = data.height;
       entity.alpha = 0;
 
       entity.updateMesh();
-    });
-
-    this.genWorker.on('heightCorrection', (data) => {
-      this.user.y = data.y;
-      this.user.height = data.h;
-      this.user.onGround = data.g;
     });
 
     this.genWorker.on('kill', (data) => {
