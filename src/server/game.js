@@ -260,7 +260,7 @@ const startSocketServer = (io) => {
       player.pos = pos;
       player.rot = data.rot;
       player.lastUpdate = new Date().getTime();
-      setInterval(() => io.emit('update', player), 5000);
+      io.emit('update', player);
     });
   });
 

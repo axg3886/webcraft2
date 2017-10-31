@@ -548,8 +548,6 @@ app.main = app.main || {
       entity.rot = this.convertVector(data.rot);
       entity.onGround = data.onGround;
       entity.alpha = 0;
-
-      entity.updateMesh();
     });
 
     this.genWorker.on('kill', (data) => {
