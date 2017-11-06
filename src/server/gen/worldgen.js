@@ -59,8 +59,8 @@ const SEA_LEVEL = 50;
 /** Methods * */
 
 const makeArr = () => {
-  const arr = [];
   const N = CHUNK_SIZE; // Math.pow(2, p),
+  const arr = new Uint8ClampedArray(N * N);
   const get = (x, z) => arr[(x * N) + z];
   const set = (x, z, v) => { arr[(x * N) + z] = v; };
   let x;
@@ -81,7 +81,7 @@ const makeArr = () => {
 
 const makeChunk = (i, j) => {
   const chunk = [];
-  const heightMap = [];
+  const heightMap = new Uint8ClampedArray(CHUNK_SIZE * CHUNK_SIZE);
   const get = (x, y, z) => { if (chunk[y]) { return chunk[y].get(x, z); } return undefined; };
   const set = (x, y, z, v) => { chunk[y].set(x, z, v); };
   const globalX = x => (i << 4) + x;
@@ -174,149 +174,11 @@ const makeWorld = () => {
   });
 };
 
-const nextTo = (world, x, y, z, v) => {
-  if (x - 1 >= 0) {
-    if (world.get(x - 1, y, z) === v) { // left
-      return 1;
-    }
-  }
-  if (z - 1 >= 0) {
-    if (world.get(x, y, z - 1) === v) { // top
-      return 2;
-    }
-  }
-  if (x + 1 < WORLD_SIZE) {
-    if (world.get(x + 1, y, z) === v) { // right
-      return 3;
-    }
-  }
-  if (z + 1 < WORLD_SIZE) {
-    if (world.get(x, y, z + 1) === v) { // bottom
-      return 4;
-    }
-  }
-  if (x - 1 >= 0 && z - 1 >= 0) {
-    if (world.get(x - 1, y, z - 1) === v) {
-      return 5;
-    }
-  }
-  if (x - 1 >= 0 && z + 1 < WORLD_SIZE) {
-    if (world.get(x - 1, y, z + 1) === v) {
-      return 6;
-    }
-  }
-  if (x + 1 < WORLD_SIZE && z - 1 >= 0) {
-    if (world.get(x + 1, z, z - 1) === v) {
-      return 7;
-    }
-  }
-  if (x + 1 < WORLD_SIZE && z + 1 < WORLD_SIZE) {
-    if (world.get(x + 1, y, z + 1) === v) {
-      return 8;
-    }
-  }
-  return 0;
-};
-
 const ifWorks = (world, x, y, z, empty) =>
   !(x < 0 || x >= WORLD_SIZE || y < 0 || y >= CHUNK_HEIGHT || z < 0 || z >= WORLD_SIZE)
     && (empty ? world.get(x, y, z) === TYPES.stone : true);
 
-const countNext = (world, x, y, z, c) => {
-  let k = 0;
-  if (x - 1 >= 0) {
-    if (world.get(x - 1, y, z) === c) {
-      k++;
-    }
-  }
-  if (z - 1 >= 0) {
-    if (world.get(x, y, z - 1) === c) {
-      k++;
-    }
-  }
-  if (x + 1 < CHUNK_SIZE) {
-    if (world.get(x + 1, y, z) === c) {
-      k++;
-    }
-  }
-  if (z + 1 < CHUNK_SIZE) {
-    if (world.get(x, y, z + 1) === c) {
-      k++;
-    }
-  }
-  return k;
-};
-
-const fillRect = (world, x, y, z, w, h, t) => {
-  const m = w * h;
-  let k = 0;
-  let i;
-  let j;
-  for (i = 0; i < w; i++) {
-    for (j = 0; j < h; j++) {
-      if (ifWorks(world, x + i, y, z + j, true)) {
-        k++;
-      }
-    }
-  }
-  if (k < m * (3 / 4)) {
-    return false;
-  }
-  for (i = 0; i < w; i++) {
-    for (j = 0; j < h; j++) {
-      if (ifWorks(world, x + i, y, z + j, false)) {
-        world.set(x + i, y, z + j, t);
-      }
-      if (ifWorks(world, x + i, y - 1, z + j, false)) {
-        world.set(x + i, y - 1, z + j, t);
-      }
-    }
-  }
-  return true;
-};
-
-const genWalls = (world) => {
-  let i;
-  let j;
-  let chunk;
-  let x;
-  let y;
-  let z;
-
-  for (i = 0; i < NUM_CHUNKS; i++) {
-    for (j = 0; j < NUM_CHUNKS; j++) {
-      chunk = world.getChunk(i, j);
-      for (y = 0; y < CHUNK_HEIGHT; y++) {
-        for (x = 0; x < CHUNK_SIZE; x++) {
-          for (z = 0; z < CHUNK_SIZE; z++) {
-            if ((
-              nextTo(chunk, x, y, z, TYPES.air) !== 0 ||
-                  nextTo(chunk, x, y, z, TYPES.stair) !== 0
-            ) && (
-                chunk.get(x, y, z) === TYPES.stone ||
-                  chunk.get(x, y, z) === TYPES.dirt ||
-                  chunk.get(x, y, z) === TYPES.grass)
-            ) {
-              chunk.set(x, y, z, TYPES.wall);
-            }
-          }
-        }
-      }
-    }
-  }
-};
-
 const nextInt = i => Math.floor(Math.random() * i);
-
-const getRandomWall = (world, y, k) => {
-  const x = nextInt(WORLD_SIZE);
-  const z = nextInt(WORLD_SIZE);
-  const q = nextTo(world, x, y, z, TYPES.air);
-  if (world.get(x, y, z) === TYPES.wall && (q > 0 && q < 5)) {
-    return { x, y, z };
-  }
-  return k < 200 ? getRandomWall(world, y, k + 1) : undefined;
-};
 
 const generateWorld = (world) => {
   let i;
@@ -364,12 +226,7 @@ module.exports = Object.freeze({
   CHUNK_SIZE,
   NUM_CHUNKS,
   WORLD_SIZE,
-  nextTo,
   ifWorks,
-  countNext,
-  fillRect,
-  genWalls,
-  getRandomWall,
   makeWorld,
   generateWorld,
   nextInt,

@@ -214,7 +214,7 @@ function generateChunkMesh(chunk, type) {
       f = faces * 4 + 1;
     }
   }
-  return meshData;
+  return Object.freeze(meshData);
 }
 
 module.exports.generateChunkMesh = generateChunkMesh;

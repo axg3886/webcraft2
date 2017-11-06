@@ -115,19 +115,21 @@ app.main = app.main || {
     });
     this.moonRender.register();
 
-    window.onresize = (function () {
-      this.GAME.WIDTH = window.innerWidth - 20;
-      this.GAME.HEIGHT = window.innerHeight - 20;
-      this.graphics.resize(this.GAME.WIDTH, this.GAME.HEIGHT);
-    }.bind(this));
+    window.onresize = (this.onResize.bind(this));
 
     this.gameState = this.GAME_STATE.LOADING;
 
     this.genWorker = io.connect();
-    this.genWorker.on('connect', this.handleConnection.bind(this));
+    app.network.handleConnection(this.genWorker);
 
       // Start the game loop
     this.update();
+  },
+
+  onResize() {
+    this.GAME.WIDTH = window.innerWidth - 20;
+    this.GAME.HEIGHT = window.innerHeight - 20;
+    this.graphics.resize(this.GAME.WIDTH, this.GAME.HEIGHT);
   },
 
   update() {
@@ -450,115 +452,5 @@ app.main = app.main || {
       ref.z = window.lerp(ref.prevZ, ref.destZ, alpha);
     };
     return ref;
-  },
-
-  handleConnection() {
-    this.genWorker.on('genMsg', (data) => {
-      if (this.gameState !== this.GAME_STATE.LOADING) {
-        this.updateRequired = true;
-        return;
-      }
-      this.genMessage = data.genMessage;
-      this.genStr = data.genStr;
-      this.genPercent = data.genPercent;
-    });
-
-    this.genWorker.on('meshData', (data) => {
-      if (this.gameState !== this.GAME_STATE.LOADING) {
-        return;
-      }
-      const meshData = data.meshData;
-
-      for (let i = 0; i < meshData.str.length; i++) {
-        const tex = `chunk${meshData.chunkIndex}-${i}`;
-        this.graphics.createMesh(meshData.str[i], tex);
-        const mesh = new MeshRenderable({
-          textures: this.standardTextures,
-          mesh: tex,
-          posOnly: true,
-          opaque: i !== 0,
-          position: $V([meshData.chunkX, 0, meshData.chunkZ]),
-        });
-        mesh.register();
-        this.chunkMeshData.push(mesh);
-      }
-
-      if (data.finished) {
-        this.gameState = this.GAME_STATE.BEGIN;
-      }
-    });
-
-    this.genWorker.on('timeUpdate', (data) => {
-      this.worldTime = data.time;
-    });
-
-    this.genWorker.on('update', (data) => {
-      let entity = this.entityList[data.id];
-
-      if (!entity) {
-        entity = this.entityList[data.id] = data;
-        entity.pos = this.convertVector(data.pos);
-        entity.rot = this.convertVector(data.rot);
-
-        if (data.selfUser) {
-          entity.mesh = this.graphics.getActiveCamera();
-          this.user = entity;
-        } else {
-          entity.mesh = new MeshRenderable({
-            mesh: 'assets/meshes/cube.obj',
-            position: $V([data.pos.x, data.pos.y, data.pos.z]),
-          });
-          entity.mesh.register();
-        }
-
-        entity.updateMesh = () => {
-          entity.mesh.transform.position.elements[0] = entity.pos.x;
-          entity.mesh.transform.position.elements[1] = entity.pos.y;
-          entity.mesh.transform.position.elements[2] = entity.pos.z;
-          entity.mesh.transform.rotation.elements[0] = entity.rot.x;
-          entity.mesh.transform.rotation.elements[1] = entity.rot.y;
-          entity.mesh.transform.rotation.elements[2] = entity.rot.z;
-        };
-
-        entity.torchParticle = new ParticleRenderable({});
-        entity.torchParticle.register();
-
-        entity.torch = new MeshRenderable({
-          scale: $V([0.05, 0.4, 0.05]),
-          rotation: $V([-0.2, 0.0, 0.2]),
-          textures: {
-            diffuseTexture: 'assets/textures/torchDiffuse.png',
-            emissionTexture: 'assets/textures/torchEmission.png',
-          },
-        });
-        entity.torch.register();
-
-        entity.torchLight = new PointLight({ intensity: $V([0.6, 0.5, 0.3]), radius: 20.0 });
-        entity.torchLight.register();
-
-        return;
-      }
-
-      if (entity.lastUpdate >= data.lastUpdate) {
-        return;
-      }
-
-      entity.lastUpdate = data.lastUpdate;
-      entity.pos = this.convertVector(data.pos);
-      entity.rot = this.convertVector(data.rot);
-      entity.onGround = data.onGround;
-      entity.alpha = 0;
-    });
-
-    this.genWorker.on('kill', (data) => {
-      this.entityList[data.id].mesh.unregister();
-      this.entityList[data.id].torch.unregister();
-      this.entityList[data.id].torchParticle.unregister();
-      this.entityList[data.id].torchLight.unregister();
-      this.graphics.unregisterRenderable(this.entityList[data.id].mesh);
-      this.entityList[data.id] = {};
-    });
-
-    this.genWorker.emit('join', { name: `Player${Math.floor(Math.random() * 100)}` });
   },
 };
