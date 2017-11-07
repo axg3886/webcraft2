@@ -653,7 +653,7 @@ app.graphics = function () {
   // Called to draw a mesh renderable
   // ONLY TO BE CALLED BY draw
   function drawMesh(renderable) {
-    if (!renderable) {
+    if (!renderable || !renderable.mesh || !meshes[renderable.mesh]) {
       return;
     }
     gl.bindBuffer(gl.ARRAY_BUFFER, meshes[renderable.mesh].buffer);
@@ -1667,6 +1667,29 @@ app.graphics = function () {
     var vt = meshData.vt;
     var vn = meshData.vn;
     var faces = meshData.faces;
+
+    var ignore = false;
+    if (vp.length === 0) {
+      console.log('Mesh ' + name + ' has length 0 in vp!');
+      ignore = true;
+    }
+    if (vt.length === 0) {
+      console.log('Mesh ' + name + ' has length 0 in vt!');
+      ignore = true;
+    }
+    if (vn.length === 0) {
+      console.log('Mesh ' + name + ' has length 0 in vn!');
+      ignore = true;
+    }
+    if (faces.length === 0) {
+      console.log('Mesh ' + name + ' has length 0 in faces!');
+      ignore = true;
+    }
+
+    if (ignore) {
+      console.log('Ignoring creation of mesh ' + name + '.');
+      return;
+    }
 
     // Subtract one from all faces because reasons
     for (var i = 0; i < faces.length; i++) {
