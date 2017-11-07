@@ -11,7 +11,7 @@ const worldGen = require('./gen/worldgen.js');
 const xxh = require('xxhashjs');
 require('./gen/cavern.js');
 require('./gen/oregen.js');
-// require('./gen/trees.js');
+require('./gen/trees.js');
 
 const GEN_STATE = Object.freeze({
   START: 'Preparing Resources',
