@@ -213,11 +213,10 @@ app.network = app.network || (function func() {
   });
 
   const kill = (socket) => socket.on('kill', (data) => {
-    entityList[data.id].mesh.unregister();
-    entityList[data.id].torch.unregister();
-    entityList[data.id].torchParticle.unregister();
-    entityList[data.id].torchLight.unregister();
     app.main.graphics.unregisterRenderable(entityList[data.id].mesh);
+    app.main.graphics.unregisterRenderable(entityList[data.id].torch);
+    app.main.graphics.unregisterRenderable(entityList[data.id].torchParticle);
+    app.main.graphics.unregisterLight(entityList[data.id].torchLight);
     entityList[data.id] = {};
   });
 

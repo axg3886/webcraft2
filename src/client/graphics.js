@@ -1399,10 +1399,18 @@ app.graphics = (function () {
     if (renderable.rindex == -1) { return; }
 
     if (renderable.opaque)		{
-      renderables[renderable.rindex] = renderables.pop();
+      if (renderable.rindex === renderables.length) {
+        renderables.pop();
+      } else {
+        renderables[renderable.rindex] = renderables.pop();
+      }
       renderable.rindex = -1;
     }		else		{
-      transparents[renderable.rindex] = transparents.pop();
+      if (renderable.rindex === transparents.length) {
+        transparents.pop();
+      } else {
+        transparents[renderable.rindex] = transparents.pop();
+      }
       renderable.rindex = -1;
     }
   }
@@ -1431,11 +1439,19 @@ app.graphics = (function () {
 
     switch (light.ltype)		{
       case 'directional' :
-        directionalLights[light.lindex] = directionalLights.pop();
+        if (light.lindex === directionalLights.length) {
+          directionalLights.pop();
+        } else {
+          directionalLights[light.lindex] = directionalLights.pop();
+        }
         light.lindex = -1;
         break;
       case 'point' :
-        pointLights[light.lindex] = pointLights.pop();
+        if (light.lindex === pointLights.length) {
+          pointLights.pop();
+        } else {
+          pointLights[light.lindex] = pointLights.pop();
+        }
         light.lindex = -1;
         break;
     }
