@@ -6,10 +6,11 @@
   Contact for other usage at: axg3886@rit.edu
 */
 const worldGen = require('./worldgen.js');
+const worldDefs = require('../../shared/worldDefs.js');
 
 function generateCaveNode(xCenter, zCenter, world, sX, sY, sZ, angleX, aY, aZ, v1, v2, var3) {
-  const centerX = xCenter * worldGen.CHUNK_SIZE + 8;
-  const centerZ = zCenter * worldGen.CHUNK_SIZE + 8;
+  const centerX = xCenter * worldDefs.CHUNK_SIZE + 8;
+  const centerZ = zCenter * worldDefs.CHUNK_SIZE + 8;
   let angleVarY = 0.0;
   let angleVarZ = 0.0;
   let startX = sX;
@@ -21,7 +22,7 @@ function generateCaveNode(xCenter, zCenter, world, sX, sY, sZ, angleX, aY, aZ, v
   let var2 = v2;
 
   if (var2 <= 0) {
-    const chunkRange = 8 * worldGen.CHUNK_SIZE - worldGen.CHUNK_SIZE;
+    const chunkRange = 8 * worldDefs.CHUNK_SIZE - worldDefs.CHUNK_SIZE;
     var2 = chunkRange - worldGen.nextInt(chunkRange / 4);
   }
 
@@ -74,43 +75,43 @@ function generateCaveNode(xCenter, zCenter, world, sX, sY, sZ, angleX, aY, aZ, v
     const displaceX = startX - centerX;
     const displaceZ = startZ - centerZ;
     const d10 = var2 - var1;
-    const scale = angleX + 2.0 + worldGen.CHUNK_SIZE;
+    const scale = angleX + 2.0 + worldDefs.CHUNK_SIZE;
 
     if (displaceX * displaceX + displaceZ * displaceZ - d10 * d10 > scale * scale) { return; }
 
-    if (startX >= centerX - worldGen.CHUNK_SIZE - modXY * 2.0 &&
-        startZ >= centerZ - worldGen.CHUNK_SIZE - modXY * 2.0 &&
-        startX <= centerX + worldGen.CHUNK_SIZE + modXY * 2.0 &&
-        startZ <= centerZ + worldGen.CHUNK_SIZE + modXY * 2.0) {
-      let tminX = Math.floor(startX - modXY) - xCenter * worldGen.CHUNK_SIZE - 1;
-      let tmaxX = Math.floor(startX + modXY) - xCenter * worldGen.CHUNK_SIZE + 1;
+    if (startX >= centerX - worldDefs.CHUNK_SIZE - modXY * 2.0 &&
+        startZ >= centerZ - worldDefs.CHUNK_SIZE - modXY * 2.0 &&
+        startX <= centerX + worldDefs.CHUNK_SIZE + modXY * 2.0 &&
+        startZ <= centerZ + worldDefs.CHUNK_SIZE + modXY * 2.0) {
+      let tminX = Math.floor(startX - modXY) - xCenter * worldDefs.CHUNK_SIZE - 1;
+      let tmaxX = Math.floor(startX + modXY) - xCenter * worldDefs.CHUNK_SIZE + 1;
       let tminY = Math.floor(startY - modXZ) - 1;
       let tmaxY = Math.floor(startY + modXZ) + 1;
-      let tminZ = Math.floor(startZ - modXY) - zCenter * worldGen.CHUNK_SIZE - 1;
-      let tmaxZ = Math.floor(startZ + modXY) - zCenter * worldGen.CHUNK_SIZE + 1;
+      let tminZ = Math.floor(startZ - modXY) - zCenter * worldDefs.CHUNK_SIZE - 1;
+      let tmaxZ = Math.floor(startZ + modXY) - zCenter * worldDefs.CHUNK_SIZE + 1;
 
       if (tminX < 0) {
         tminX = 0;
       }
 
-      if (tmaxX > worldGen.CHUNK_SIZE) {
-        tmaxX = worldGen.CHUNK_SIZE;
+      if (tmaxX > worldDefs.CHUNK_SIZE) {
+        tmaxX = worldDefs.CHUNK_SIZE;
       }
 
       if (tminY < 1) {
         tminY = 1;
       }
 
-      if (tmaxY > worldGen.CHUNK_HEIGHT - 8) {
-        tmaxY = worldGen.CHUNK_HEIGHT - 8;
+      if (tmaxY > worldDefs.CHUNK_HEIGHT - 8) {
+        tmaxY = worldDefs.CHUNK_HEIGHT - 8;
       }
 
       if (tminZ < 0) {
         tminZ = 0;
       }
 
-      if (tmaxZ > worldGen.CHUNK_SIZE) {
-        tmaxZ = worldGen.CHUNK_SIZE;
+      if (tmaxZ > worldDefs.CHUNK_SIZE) {
+        tmaxZ = worldDefs.CHUNK_SIZE;
       }
 
       let hitOcean = false;
@@ -118,11 +119,11 @@ function generateCaveNode(xCenter, zCenter, world, sX, sY, sZ, angleX, aY, aZ, v
       for (let localX = tminX; !hitOcean && localX < tmaxX; ++localX) {
         for (let localZ = tminZ; !hitOcean && localZ < tmaxZ; ++localZ) {
           for (let localY = tmaxY + 1; !hitOcean && localY >= tminY - 1; --localY) {
-            const x = xCenter * worldGen.CHUNK_SIZE + localX;
-            const z = zCenter * worldGen.CHUNK_SIZE + localZ;
+            const x = xCenter * worldDefs.CHUNK_SIZE + localX;
+            const z = zCenter * worldDefs.CHUNK_SIZE + localZ;
 
             if (worldGen.ifWorks(world, x, localY, z, false)) {
-              if (world.get(x, localY, z) === worldGen.TYPES.water) {
+              if (world.get(x, localY, z) === worldDefs.TYPES.water) {
                 hitOcean = true;
               }
 
@@ -137,28 +138,28 @@ function generateCaveNode(xCenter, zCenter, world, sX, sY, sZ, angleX, aY, aZ, v
 
       if (!hitOcean) {
         for (let localX = tminX; localX < tmaxX; ++localX) {
-          const modX = (localX + xCenter * worldGen.CHUNK_SIZE + 0.5 - startX) / modXY;
+          const modX = (localX + xCenter * worldDefs.CHUNK_SIZE + 0.5 - startX) / modXY;
 
           for (let localZ = tminZ; localZ < tmaxZ; ++localZ) {
-            const modZ = (localZ + zCenter * worldGen.CHUNK_SIZE + 0.5 - startZ) / modXY;
+            const modZ = (localZ + zCenter * worldDefs.CHUNK_SIZE + 0.5 - startZ) / modXY;
 
             if (modX * modX + modZ * modZ < 1.0) {
               for (let localY = tmaxY - 1; localY >= tminY; --localY) {
                 const realY = (localY + 0.5 - startY) / modXZ;
-                const x = xCenter * worldGen.CHUNK_SIZE + localX;
-                const z = zCenter * worldGen.CHUNK_SIZE + localZ;
+                const x = xCenter * worldDefs.CHUNK_SIZE + localX;
+                const z = zCenter * worldDefs.CHUNK_SIZE + localZ;
 
                 if (realY > -0.7 && modX * modX + realY * realY + modZ * modZ < 1.0
                       && worldGen.ifWorks(world, x, localY, z, false)) {
                   const block = world.get(x, localY, z);
 
-                  if (block === worldGen.TYPES.stone ||
-                      block === worldGen.TYPES.dirt ||
-                      block === worldGen.TYPES.grass ||
-                      block === worldGen.TYPES.iron ||
-                      block === worldGen.TYPES.gold) {
+                  if (block === worldDefs.TYPES.stone ||
+                      block === worldDefs.TYPES.dirt ||
+                      block === worldDefs.TYPES.grass ||
+                      block === worldDefs.TYPES.iron ||
+                      block === worldDefs.TYPES.gold) {
                     world.set(x, localY, z,
-                      (localY < 10) ? worldGen.TYPES.lava : worldGen.TYPES.air);
+                      (localY < 10) ? worldDefs.TYPES.lava : worldDefs.TYPES.air);
                   }
                 }
               }
@@ -188,9 +189,9 @@ function genCaves(world, xChunk, zChunk, xCenter, zCenter) {
     numBigNodes = 0;
   }
   for (let i = 0; i < numBigNodes; ++i) {
-    const cX = xChunk * worldGen.CHUNK_SIZE + worldGen.nextInt(worldGen.CHUNK_SIZE);
-    const cY = worldGen.nextInt(worldGen.CHUNK_HEIGHT - 8) + 8;
-    const cZ = zChunk * worldGen.CHUNK_SIZE + worldGen.nextInt(worldGen.CHUNK_SIZE);
+    const cX = xChunk * worldDefs.CHUNK_SIZE + worldGen.nextInt(worldDefs.CHUNK_SIZE);
+    const cY = worldGen.nextInt(worldDefs.CHUNK_HEIGHT - 8) + 8;
+    const cZ = zChunk * worldDefs.CHUNK_SIZE + worldGen.nextInt(worldDefs.CHUNK_SIZE);
     let numSmallNodes = 1;
 
     if (worldGen.nextInt(4) === 0) {

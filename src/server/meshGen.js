@@ -5,13 +5,13 @@
   Under conversion to Node.js for: IGME-590 Project 2.
   Contact for other usage at: axg3886@rit.edu
 */
-const worldGen = require('./gen/worldgen.js');
+const worldDefs = require('../shared/worldDefs.js');
 
 // Determines whether a block should be composed into the chunk mesh
 // @param { number } b - the block to test
 // @param { 1 = transparent } type - What type is it
-const isBlockSolid = (b, type) => worldGen.TYPE_CUBE[b] &&
-  (type === 1 ? worldGen.TYPE_OPAQUE[b] : !(worldGen.TYPE_OPAQUE[b]));
+const isBlockSolid = (b, type) => worldDefs.TYPE_CUBE[b] &&
+  (type === 1 ? worldDefs.TYPE_OPAQUE[b] : !(worldDefs.TYPE_OPAQUE[b]));
 
 // Optimization trick - _only do this once_, since it never changes.
 const standardMeshData = () => {
@@ -74,12 +74,12 @@ function generateChunkMesh(chunk, type) {
 
   // I can't believe I'm reverse-engineering my own rendering engine
   // EDIT: Haha, not true anymore!
-  for (let i = 0; i < worldGen.CHUNK_HEIGHT *
-            worldGen.CHUNK_SIZE *
-            worldGen.CHUNK_SIZE; ++i) {
-    const x = i % worldGen.CHUNK_SIZE;
-    const y = Math.floor(i / (worldGen.CHUNK_SIZE * worldGen.CHUNK_SIZE));
-    const z = Math.floor(i / worldGen.CHUNK_SIZE) % worldGen.CHUNK_SIZE;
+  for (let i = 0; i < worldDefs.CHUNK_HEIGHT *
+            worldDefs.CHUNK_SIZE *
+            worldDefs.CHUNK_SIZE; ++i) {
+    const x = i % worldDefs.CHUNK_SIZE;
+    const y = Math.floor(i / (worldDefs.CHUNK_SIZE * worldDefs.CHUNK_SIZE));
+    const z = Math.floor(i / worldDefs.CHUNK_SIZE) % worldDefs.CHUNK_SIZE;
 
     const block = chunk.get(x, y, z);
 
@@ -120,7 +120,7 @@ function generateChunkMesh(chunk, type) {
     }
 
     // Right
-    if (x === worldGen.CHUNK_SIZE - 1 || !(isBlockSolid(chunk.get(x + 1, y, z), type))) {
+    if (x === worldDefs.CHUNK_SIZE - 1 || !(isBlockSolid(chunk.get(x + 1, y, z), type))) {
       meshData.vp.push(aX); meshData.vp.push(bY); meshData.vp.push(bZ);
       meshData.vp.push(aX); meshData.vp.push(aY); meshData.vp.push(aZ);
       meshData.vp.push(aX); meshData.vp.push(bY); meshData.vp.push(aZ);
@@ -139,7 +139,7 @@ function generateChunkMesh(chunk, type) {
     }
 
     // Front
-    if (z === worldGen.CHUNK_SIZE - 1 || !(isBlockSolid(chunk.get(x, y, z + 1), type))) {
+    if (z === worldDefs.CHUNK_SIZE - 1 || !(isBlockSolid(chunk.get(x, y, z + 1), type))) {
       meshData.vp.push(aX); meshData.vp.push(bY); meshData.vp.push(aZ);
       meshData.vp.push(bX); meshData.vp.push(aY); meshData.vp.push(aZ);
       meshData.vp.push(bX); meshData.vp.push(bY); meshData.vp.push(aZ);
@@ -177,7 +177,7 @@ function generateChunkMesh(chunk, type) {
     }
 
     // Top
-    if (y === worldGen.CHUNK_HEIGHT - 1 || !(isBlockSolid(chunk.get(x, y + 1, z), type))) {
+    if (y === worldDefs.CHUNK_HEIGHT - 1 || !(isBlockSolid(chunk.get(x, y + 1, z), type))) {
       meshData.vp.push(aX); meshData.vp.push(aY); meshData.vp.push(aZ);
       meshData.vp.push(bX); meshData.vp.push(aY); meshData.vp.push(bZ);
       meshData.vp.push(bX); meshData.vp.push(aY); meshData.vp.push(aZ);

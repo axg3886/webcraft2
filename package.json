@@ -4,8 +4,8 @@
   "description": "Webcraft 2 for IGME-590",
   "main": "src/server.js",
   "scripts": {
-    "build": "babel ./src/client --out-file ./assets/js/bundle.js",
-    "watch": "babel --watch ./src/client --out-file ./assets/js/bundle.js",
+    "build": "babel ./src/client ./src/shared --out-file ./assets/js/bundle.js",
+    "watch": "babel --watch ./src/client --watch ./src/shared --out-file ./assets/js/bundle.js",
     "nodemon": "nodemon --watch ./src ./src/server/main.js",
     "start": "node ./src/server/main.js",
     "pretest": "eslint ./src/server --fix",

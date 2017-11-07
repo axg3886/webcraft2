@@ -6,6 +6,7 @@
   Contact for other usage at: axg3886@rit.edu
 */
 const meshGen = require('./meshGen.js');
+const worldDefs = require('../shared/worldDefs.js');
 const worldGen = require('./gen/worldgen.js');
 const xxh = require('xxhashjs');
 require('./gen/cavern.js');
@@ -54,18 +55,18 @@ const generateWorld = () => {
     console.log(genState);
     genState = GEN_STATE.WORLD;
     genAmount = 0;
-    genMax = worldGen.CHUNK_SIZE + 1;
+    genMax = worldDefs.CHUNK_SIZE + 1;
   } else if (genState === GEN_STATE.WORLD) {
     if (genAmount === 0) {
-      world = worldGen.makeWorld();
+      world = worldDefs.makeWorld();
       world = worldGen.generateWorld(world);
       genAmount++;
       console.log(genState);
     } else if (genAmount < genMax - 1) {
       for (let n = 0; n < worldGen.genTypes.length; n++) {
         const generator = worldGen.genTypes[n];
-        for (let i = 0; i < worldGen.NUM_CHUNKS; i++) {
-          for (let j = 0; j < worldGen.NUM_CHUNKS; j++) {
+        for (let i = 0; i < worldDefs.NUM_CHUNKS; i++) {
+          for (let j = 0; j < worldDefs.NUM_CHUNKS; j++) {
             generator.generate(world, i, j);
           }
         }
@@ -119,8 +120,8 @@ const makeFakeVector = (x, y, z) => {
 };
 
 const makeEntity = (name) => {
-  const centerX = worldGen.WORLD_SIZE / 2 + worldGen.nextInt(6) - 3;
-  const centerZ = worldGen.WORLD_SIZE / 2 + worldGen.nextInt(6) - 3;
+  const centerX = worldDefs.WORLD_SIZE / 2 + worldGen.nextInt(6) - 3;
+  const centerZ = worldDefs.WORLD_SIZE / 2 + worldGen.nextInt(6) - 3;
   const centerY = world.height(centerX, centerZ) + 3;
   const e = {
     name,
@@ -133,135 +134,91 @@ const makeEntity = (name) => {
   return e;
 };
 
+const syncMeshData = (socket) => {
+  let meshCount = 0;
+  return () => {
+    if (genState !== GEN_STATE.END) {
+      socket.emit('genMsg', latestGenData);
+    } else if (meshCount < builtMeshData.length) {
+      const msg = makeMsg(meshCount, builtMeshData.length, GEN_STATE.SEND);
+      socket.emit('genMsg', msg);
+      socket.emit('meshData', {
+        meshData: builtMeshData[meshCount],
+        finished: meshCount === builtMeshData.length - 1,
+        start: meshCount === 0,
+      });
+      meshCount++;
+    } else if (meshCount === builtMeshData.length) {
+      socket.emit('worldData', world.write());
+      meshCount++;
+    }
+  };
+};
+
+// Handle entity join
+const newPlayer = (s) => s.on('join', (data) => {
+  const socket = s;
+  const player = makeEntity(data.name);
+  socket.playerId = player.id;
+  entityList[player.id] = player;
+
+  player.selfUser = true;
+  socket.emit('update', player);
+  player.selfUser = false;
+  socket.broadcast.emit('update', player);
+
+  const keys = Object.keys(entityList);
+  for (let i = 0; i < keys.length; i++) {
+    socket.emit('update', entityList[keys[i]]);
+  }
+  console.log(`Connected: ${player.id}`);
+});
+
+// Handle entity disconnect
+const disconnect = (io, socket) => socket.on('disconnect', () => {
+  const player = entityList[socket.playerId];
+  if (player) {
+    console.log(`Disconnected: ${player.id}`);
+    io.emit('kill', { id: player.id });
+    delete entityList[player.id];
+  }
+});
+
+// Handle entity movement
+const movement = (io, socket) => socket.on('movement', (data) => {
+  const player = entityList[socket.playerId];
+  if (!player) {
+    return;
+  }
+
+  // Height check
+  const pos = worldDefs.correctPosition(world, data.pos, player.pos);
+
+  const equality = player.pos.x === pos.x && player.pos.destX === pos.destX &&
+                   player.pos.y === pos.y && player.pos.destY === pos.destY &&
+                   player.pos.z === pos.z && player.pos.destZ === pos.destZ;
+
+  player.onGround = pos.y === player.pos.y || pos.y <= 0;
+  player.pos = pos;
+  player.rot = data.rot;
+  player.lastUpdate = new Date().getTime();
+  if (!equality) {
+    io.emit('update', player);
+  } else {
+    socket.broadcast.emit('update', player);
+  }
+});
+
 const startSocketServer = (io) => {
   io.sockets.on('connection', (sock) => {
     const socket = sock;
-    let meshCount = 0;
 
     // Spawn 'thread' to send client world data
-    setInterval(() => {
-      if (genState !== GEN_STATE.END) {
-        socket.emit('genMsg', latestGenData);
-      } else if (meshCount < builtMeshData.length) {
-        const msg = makeMsg(meshCount, builtMeshData.length, GEN_STATE.SEND);
-        socket.emit('genMsg', msg);
-        socket.emit('meshData', {
-          meshData: builtMeshData[meshCount],
-          finished: meshCount === builtMeshData.length - 1,
-          start: meshCount === 0,
-        });
-        meshCount++;
-      }
-    }, 20);
+    setInterval(syncMeshData(socket), 20);
 
-    socket.on('join', (data) => {
-      // Create entity
-      const player = makeEntity(data.name);
-      socket.playerId = player.id;
-      entityList[player.id] = player;
-
-      player.selfUser = true;
-      socket.emit('update', player);
-      player.selfUser = false;
-      socket.broadcast.emit('update', player);
-
-      const keys = Object.keys(entityList);
-      for (let i = 0; i < keys.length; i++) {
-        socket.emit('update', entityList[keys[i]]);
-      }
-    });
-
-    socket.on('disconnect', () => {
-      const player = entityList[socket.playerId];
-      if (player) {
-        console.log(`Disconnected: ${player.id}`);
-        io.emit('kill', { id: player.id });
-        delete entityList[player.id];
-      }
-    });
-
-    // Handle entity movement
-    socket.on('movement', (data) => {
-      const player = entityList[socket.playerId];
-      if (!player) {
-        return;
-      }
-
-      // Height check
-      const pos = data.pos;
-
-      const posCheck = (x, y, z) => {
-        const floorX = Math.floor(x);
-        const floorY = Math.floor(y);
-        const floorZ = Math.floor(z);
-        return world.get(floorX, floorY, floorZ) || worldGen.TYPES.air;
-      };
-
-      let gravity = 0.4905;
-      if (posCheck(pos.x, pos.y, pos.z) === worldGen.TYPES.water) {
-        gravity *= 0.5; // Fall slower in water
-      }
-      pos.destY -= gravity;
-
-      if (worldGen.TYPE_OPAQUE[posCheck(pos.x - 0.25, pos.y, pos.z)]) {
-        if (worldGen.TYPE_OPAQUE[posCheck(pos.x - 0.25, pos.y + 1, pos.z)]) {
-          pos.x = player.pos.x;
-          pos.destX = player.pos.destX;
-        } else {
-          pos.y += 0.5;
-          pos.destY += 0.5;
-        }
-      }
-      if (worldGen.TYPE_OPAQUE[posCheck(pos.x + 0.25, pos.y, pos.z)]) {
-        if (worldGen.TYPE_OPAQUE[posCheck(pos.x + 0.25, pos.y + 1, pos.z)]) {
-          pos.x = player.pos.x;
-          pos.destX = player.pos.destX;
-        } else {
-          pos.y += 0.5;
-          pos.destY += 0.5;
-        }
-      }
-      if (worldGen.TYPE_OPAQUE[posCheck(pos.x, pos.y, pos.z - 0.25)]) {
-        if (worldGen.TYPE_OPAQUE[posCheck(pos.x, pos.y + 1, pos.z - 0.25)]) {
-          pos.z = player.pos.z;
-          pos.destZ = player.pos.destZ;
-        } else {
-          pos.y += 0.25;
-          pos.destY += 0.25;
-        }
-      }
-      if (worldGen.TYPE_OPAQUE[posCheck(pos.x, pos.y, pos.z + 0.25)]) {
-        if (worldGen.TYPE_OPAQUE[posCheck(pos.x, pos.y + 1, pos.z + 0.25)]) {
-          pos.z = player.pos.z;
-          pos.destZ = player.pos.destZ;
-        } else {
-          pos.y += 0.5;
-          pos.destY += 0.5;
-        }
-      }
-
-      if (worldGen.TYPE_OPAQUE[posCheck(pos.x, pos.y - 0.25, pos.z)]) {
-        pos.y = player.pos.y;
-        pos.destY = player.pos.destY;
-      }
-      if (worldGen.TYPE_OPAQUE[posCheck(pos.x, pos.y + 0.25, pos.z)]) {
-        pos.y = player.pos.y;
-        pos.destY = player.pos.destY;
-      }
-
-      pos.x = Math.max(1, Math.min(worldGen.WORLD_SIZE - 1, pos.x));
-      pos.y = Math.max(-2, Math.min(worldGen.CHUNK_HEIGHT, pos.y));
-      pos.z = Math.max(1, Math.min(worldGen.WORLD_SIZE - 1, pos.z));
-      pos.destX = Math.max(1, Math.min(worldGen.WORLD_SIZE - 1, pos.destX));
-      pos.destY = Math.max(-2, Math.min(worldGen.CHUNK_HEIGHT, pos.destY));
-      pos.destZ = Math.max(1, Math.min(worldGen.WORLD_SIZE - 1, pos.destZ));
-
-      player.onGround = pos.y === player.pos.y || pos.y <= 0;
-      player.pos = pos;
-      player.rot = data.rot;
-      player.lastUpdate = new Date().getTime();
-      io.emit('update', player);
-    });
+    newPlayer(socket);
+    disconnect(io, socket);
+    movement(io, socket);
   });
 
   genState = GEN_STATE.START;

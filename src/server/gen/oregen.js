@@ -6,9 +6,10 @@
   Contact for other usage at: axg3886@rit.edu
 */
 const worldGen = require('./worldgen.js');
+const worldDefs = require('../../shared/worldDefs.js');
 
-const ironOre = { maxVeins: 4.0, numBlocks: 24, maxY: 128, block: worldGen.TYPES.iron };
-const goldOre = { maxVeins: 0.4, numBlocks: 24, maxY: 32, block: worldGen.TYPES.gold };
+const ironOre = { maxVeins: 4.0, numBlocks: 24, maxY: 128, block: worldDefs.TYPES.iron };
+const goldOre = { maxVeins: 0.4, numBlocks: 24, maxY: 32, block: worldDefs.TYPES.gold };
 
 function genVein(world, x, y, z, numBlocks, block) {
   const angle = Math.random() * Math.PI;
@@ -64,7 +65,7 @@ function genVein(world, x, y, z, numBlocks, block) {
               if (worldGen.ifWorks(world, i, j, k, false)) {
                 b = world.get(i, j, k);
                 if (xArc * xArc + yArc * yArc + zArc * zArc < 1.0) {
-                  if (b === worldGen.TYPES.stone) {
+                  if (b === worldDefs.TYPES.stone) {
                     world.set(i, j, k, block);
                   }
                 }
@@ -84,16 +85,16 @@ function genOre(world, i, j, ore) {
   let z;
   veins = ore.maxVeins;
   while (veins >= 1.0) {
-    x = i * worldGen.CHUNK_SIZE + worldGen.nextInt(worldGen.CHUNK_SIZE);
+    x = i * worldDefs.CHUNK_SIZE + worldGen.nextInt(worldDefs.CHUNK_SIZE);
     y = worldGen.nextInt(ore.maxY);
-    z = j * worldGen.CHUNK_SIZE + worldGen.nextInt(worldGen.CHUNK_SIZE);
+    z = j * worldDefs.CHUNK_SIZE + worldGen.nextInt(worldDefs.CHUNK_SIZE);
     genVein(world, x, y, z, ore.numBlocks, ore.block);
     veins--;
   }
   if (Math.random() < veins) {
-    x = i * worldGen.CHUNK_SIZE + worldGen.nextInt(worldGen.CHUNK_SIZE);
+    x = i * worldDefs.CHUNK_SIZE + worldGen.nextInt(worldDefs.CHUNK_SIZE);
     y = worldGen.nextInt(ore.maxY);
-    z = j * worldGen.CHUNK_SIZE + worldGen.nextInt(worldGen.CHUNK_SIZE);
+    z = j * worldDefs.CHUNK_SIZE + worldGen.nextInt(worldDefs.CHUNK_SIZE);
     genVein(world, x, y, z, ore.numBlocks, ore.block);
   }
 }

@@ -1,4 +1,3 @@
-/* globals io */ // Socket.io
 /* globals $V $L Vector */ // Sylvester
 /* globals DirectionalLight PointLight */ // Rendering Engine Lights
 /* globals  MeshRenderable ParticleRenderable */ // Rendering Engine Renderables
@@ -43,7 +42,6 @@ app.main = app.main || {
   musicPaused: false,
   musicPlayer: null,
 
-  genWorker: undefined,
   genMessage: '',
   genStr: '          ',
   genPercent: 0.0.toFixed(2),
@@ -57,9 +55,6 @@ app.main = app.main || {
 
   sunRender: null,
   moonRender: null,
-
-  entityList: { },
-  user: null,
 
   updateRequired: false,
 
@@ -119,8 +114,7 @@ app.main = app.main || {
 
     this.gameState = this.GAME_STATE.LOADING;
 
-    this.genWorker = io.connect();
-    app.network.handleConnection(this.genWorker);
+    app.network.startConnection();
 
       // Start the game loop
     this.update();
@@ -176,6 +170,7 @@ app.main = app.main || {
     } else if (this.gameState === this.GAME_STATE.DEFAULT) {
       if (this.handleKeyPress) {
         this.keyCheck();
+        app.network.updateEntity();
       }
 
       this.graphics.draw(dt);
@@ -208,8 +203,9 @@ app.main = app.main || {
       this.graphics.drawText(`x : ${(pos[0]).toFixed(1)}`, 8, 20, '10pt "Ubuntu Mono"', '#A0A0A0');
       this.graphics.drawText(`y : ${(pos[1]).toFixed(1)}`, 8, 32, '10pt "Ubuntu Mono"', '#A0A0A0');
       this.graphics.drawText(`z : ${(pos[2]).toFixed(1)}`, 8, 44, '10pt "Ubuntu Mono"', '#A0A0A0');
-      if (this.user) {
-        this.graphics.drawText(`g : ${this.user.onGround}`, 8, 56, '10pt "Ubuntu Mono"', '#A0A0A0');
+      const user = app.network.user();
+      if (user) {
+        this.graphics.drawText(`g : ${user.onGround}`, 8, 56, '10pt "Ubuntu Mono"', '#A0A0A0');
       }
         // Draw rtime in top right corner
       this.graphics.drawText(this.readableTime(),
@@ -226,10 +222,14 @@ app.main = app.main || {
   },
 
   keyCheck() {
-    const yaw = this.user.rot.y;
+    const user = app.network.user();
+    if (!user) {
+      return;
+    }
+    const yaw = user.rot.y;
 
-    this.user.pos.updatePrev();
-    this.user.rot.updatePrev();
+    user.pos.updatePrev();
+    user.rot.updatePrev();
 
     if (this.myKeys.keydown[80]) {
       this.musicPaused = true;
@@ -241,96 +241,41 @@ app.main = app.main || {
     }
 
     if (this.myKeys.keydown[87]) { // forward - w
-      this.user.pos.destX -= Math.sin(yaw) * 2;
-      this.user.pos.destZ -= Math.cos(yaw) * 2;
+      user.pos.destX -= Math.sin(yaw) * 2;
+      user.pos.destZ -= Math.cos(yaw) * 2;
     }
     if (this.myKeys.keydown[83]) { // back - s
-      this.user.pos.destX += Math.sin(yaw) * 2;
-      this.user.pos.destZ += Math.cos(yaw) * 2;
+      user.pos.destX += Math.sin(yaw) * 2;
+      user.pos.destZ += Math.cos(yaw) * 2;
     }
     if (this.myKeys.keydown[65]) { // left - a
-      this.user.pos.destX -= Math.cos(yaw) * 2;
-      this.user.pos.destZ += Math.sin(yaw) * 2;
+      user.pos.destX -= Math.cos(yaw) * 2;
+      user.pos.destZ += Math.sin(yaw) * 2;
     }
     if (this.myKeys.keydown[68]) { // right - d
-      this.user.pos.destX += Math.cos(yaw) * 2;
-      this.user.pos.destZ -= Math.sin(yaw) * 2;
+      user.pos.destX += Math.cos(yaw) * 2;
+      user.pos.destZ -= Math.sin(yaw) * 2;
     }
-    if (this.myKeys.keydown[32] && this.user.onGround) { // up - space
-      this.user.pos.destY += 50;
+    if (this.myKeys.keydown[32] && user.onGround) { // up - space
+      user.pos.destY += 25;
     }
 
       // Inverted up/down
     if (this.myKeys.keydown[38]) { // up
-      this.user.rot.destX -= 0.02; // look up
+      user.rot.destX -= 0.02; // look up
     }
     if (this.myKeys.keydown[40]) { // down
-      this.user.rot.destX += 0.02; // peer down
+      user.rot.destX += 0.02; // peer down
     }
     if (this.myKeys.keydown[37]) { // left
-      this.user.rot.destY += 0.02; // look left
+      user.rot.destY += 0.02; // look left
     }
     if (this.myKeys.keydown[39]) { // right
-      this.user.rot.destY -= 0.02; // peer right
+      user.rot.destY -= 0.02; // peer right
     }
-    this.user.rot.destX = window.clamp(this.user.rot.destX, -1.5, 1.5);
+    user.rot.destX = window.clamp(user.rot.destX, -1.5, 1.5);
 
-    this.user.alpha = 0;
-
-    // Entity update
-    const keys = Object.keys(this.entityList);
-    for (let i = 0; i < keys.length; i++) {
-      const entity = this.entityList[keys[i]];
-
-      if (!entity.pos) {
-        continue;
-      }
-
-      // Update alpha
-      if (entity.alpha < 1) {
-        entity.alpha += 0.05;
-      }
-
-      // Lerp position
-      entity.pos.lerp(entity.alpha);
-      entity.pos.y = Math.max(0, entity.pos.y);
-      entity.rot.lerp(entity.alpha);
-
-      const x = -Math.sin(entity.rot.destY - 0.4) * 1.5;
-      const z = -Math.cos(entity.rot.destY - 0.4) * 1.5;
-
-      const tx = -Math.sin(entity.rot.destY - 0.42) * 1.5;
-      const tz = -Math.cos(entity.rot.destY - 0.42) * 1.5;
-
-      entity.updateMesh();
-
-      entity.torchParticle.transform.position.elements[0] = x + entity.pos.x;
-      entity.torchParticle.transform.position.elements[1] = entity.pos.y - 0.3;
-      entity.torchParticle.transform.position.elements[2] = z + entity.pos.z;
-
-      entity.torch.transform.position.elements[0] = tx + entity.pos.x;
-      entity.torch.transform.position.elements[1] = entity.pos.y - 0.5;
-      entity.torch.transform.position.elements[2] = tz + entity.pos.z;
-
-      entity.torchLight.position = entity.torch.transform.position;
-
-      entity.torch.transform.rotation.elements[1] = entity.rot.destY;
-    }
-    this.user.mesh.transform.position.elements[1] += 2;
-    this.user.torchParticle.transform.position.elements[1] += 2;
-    this.user.torch.transform.position.elements[1] += 2;
-
-    // Emit update
-    this.genWorker.emit('movement', this.getSendingUser());
-  },
-
-  getSendingUser() {
-    return {
-      pos: this.user.pos,
-      rot: this.user.rot,
-      onGround: this.user.onGround,
-      lastUpdate: this.user.lastUpdate,
-    };
+    user.alpha = 0;
   },
 
   calculateDeltaTime() {
@@ -437,20 +382,5 @@ app.main = app.main || {
     const aMinute = Math.abs(tMinute);
     const aMin = (aMinute < 10 ? '0' : '') + aMinute;
     return `${((theHour < 0 || tMinute < 0) ? '-' : '') + absHour}:${aMin}`;
-  },
-
-  convertVector(input) {
-    const ref = input;
-    ref.updatePrev = () => {
-      ref.prevX = ref.x;
-      ref.prevY = ref.y;
-      ref.prevZ = ref.z;
-    };
-    ref.lerp = (alpha) => {
-      ref.x = window.lerp(ref.prevX, ref.destX, alpha);
-      ref.y = window.lerp(ref.prevY, ref.destY, alpha);
-      ref.z = window.lerp(ref.prevZ, ref.destZ, alpha);
-    };
-    return ref;
   },
 };

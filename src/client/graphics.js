@@ -633,6 +633,9 @@ app.graphics = (function () {
 	// Called to draw a mesh renderable
 	// ONLY TO BE CALLED BY draw
   function drawMesh(renderable)	{
+    if (!renderable) {
+      return;
+    }
     gl.bindBuffer(gl.ARRAY_BUFFER, meshes[renderable.mesh].buffer);
     const v = meshes[renderable.mesh].count;
     const shader = shaders[renderable.material.shader];

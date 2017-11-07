@@ -1,66 +1,5 @@
 "use strict";
 
-var app = app || {};
-
-app.shaders = function () {
-	// Manipulates the vertices and sets up for the material shader
-	var vertexShader = "\nattribute vec3 vpos;\nattribute vec2 vtex;\nattribute vec3 vnor;\n\nuniform mat4 world;\nuniform mat4 persp;\n\nvarying vec3 pos;\nvarying vec2 uv;\nvarying vec3 norm;\n\nvoid main(void)\n{\n\tpos = vec3(world * vec4(vpos, 1.0));\n\tuv = vtex;\n\tnorm = normalize(vec3(world * vec4(vnor, 0.0)));\n\n\tgl_Position = persp * world * vec4(vpos, 1.0);\n}\n";
-
-	// Sets the shader up for the material calculation
-	var preMaterial = "\n#extension GL_EXT_draw_buffers : require\nprecision mediump float;\n\nvarying vec3 pos;\nvarying vec2 uv;\nvarying vec3 norm;\n\nvec3 diffuse = vec3(0.5);\nvec3 normal = vec3(0.0, 0.0, 1.0);\nvec3 specular = vec3(0.5);\nvec3 emission = vec3(0.0);\nfloat roughness = 0.5;\nfloat opacity = 1.0;\n";
-
-	// Interprets the results of the material
-	var postMaterial = "\nuniform vec4 camPos;\n\n// float fogStart = 64.0;\n// float fogEnd = 80.0;\n\nvoid main(void)\n{\n\tmaterial();\n\n\n\t// float dist = length(vec3(camPos) - pos);\n\t// float fog = (dist - fogStart) / (fogEnd - fogStart);\n\t// fog = clamp(fog, 0.0, 1.0);\n\n\n\tgl_FragData[0] = vec4(diffuse, opacity);\n\n\tgl_FragData[1] = vec4(norm, 0.0);\n\n\tgl_FragData[2] = vec4(specular, roughness);\n\n\tgl_FragData[3] = vec4(emission, 1.0);\n\n\tgl_FragData[4] = vec4(pos, 1.0);\n}\n";
-
-	// Creates the material function which serves as the "meat" of the material
-	var defaultMaterial = "\nuniform sampler2D diffuseTexture;\nuniform sampler2D specularTexture;\nuniform sampler2D emissionTexture;\n\nvoid material(void)\n{\n\tvec4 dTex = texture2D(diffuseTexture, uv);\n\tvec4 sTex = texture2D(specularTexture, uv);\n\tvec4 eTex = texture2D(emissionTexture, uv);\n\n\n\tdiffuse = dTex.rgb;\n\topacity = dTex.a;\n\tspecular = sTex.rgb;\n\troughness = sTex.a;\n\temission = eTex.rgb;\n}\n";
-
-	// Simple vertex shader for lights
-	var lightVertex = "\nattribute vec3 vpos;\n\nvarying vec2 uv;\n\nvoid main(void)\n{\n\tuv = vec2((vpos + vec3(1.0)) / 2.0);\n\tgl_Position = vec4(vpos, 1.0);\n}\n";
-
-	// Sets the emission value
-	var lightPrepass = "\nprecision mediump float;\n\nuniform sampler2D emission;\n\nvarying vec2 uv;\n\nvoid main(void)\n{\n\tgl_FragData[0] = texture2D(emission, uv);\n}\n";
-
-	// Ambient light pass
-	var lightAmbient = "\nprecision mediump float;\n\nuniform sampler2D diffuse;\n\nuniform vec4 intensity;\n\nvarying vec2 uv;\n\nvoid main(void)\n{\n\tvec4 dtex = texture2D(diffuse, uv);\n\tgl_FragData[0] = vec4(intensity.rgb * dtex.rgb, dtex.a);\n}\n";
-
-	var lightDirectional = "\nprecision mediump float;\n\nuniform sampler2D diffuse;\nuniform sampler2D normal;\nuniform sampler2D specular;\nuniform sampler2D position;\n\nuniform vec4 direction;\nuniform vec4 intensity;\nuniform vec4 camPos;\n\nvarying vec2 uv;\n\nvoid main(void)\n{\n\tvec3 opDir = -vec3(direction);\n\n\tvec4 dtex = texture2D(diffuse, uv);\n\n\t// DIFFUSE\n\n\tvec3 normTex = texture2D(normal, uv).rgb;\n\tfloat diff = max(dot(normTex, opDir), 0.0);\n\tvec3 diffuseIntensity = (intensity * diff).rgb * dtex.rgb;\n\n\t// SPECULAR\n\n\tvec3 fragPos = texture2D(position, uv).rgb;\n\tvec3 viewDir = normalize(vec3(camPos) - fragPos);\n\tvec3 reflectDir = reflect(vec3(direction), normTex);\n\tvec4 specTex = texture2D(specular, uv);\n\tfloat spec = pow(max(dot(viewDir, reflectDir), 0.0), 2.0 / max(specTex.a * specTex.a, 0.01));\n\tvec3 specularIntensity = (intensity.rgb * spec) * specTex.rgb;\n\n\tgl_FragData[0] = vec4(diffuseIntensity + specularIntensity, dtex.a);\n}\n";
-
-	var lightPoint = "\nprecision mediump float;\n\nuniform sampler2D diffuse;\nuniform sampler2D normal;\nuniform sampler2D specular;\nuniform sampler2D position;\n\nuniform vec4 lightPos;\nuniform vec4 intensity;\nuniform vec4 camPos;\nuniform float radius;\n\nvarying vec2 uv;\n\nvoid main(void)\n{\n\tvec3 fragPos = texture2D(position, uv).rgb;\n\n\tfloat dist = length(fragPos - vec3(lightPos));\n\tfloat power = max(1.0 - (dist / radius), 0.0);\n\n\tvec3 direction = normalize(fragPos - vec3(lightPos));\n\tvec3 opDir = -vec3(direction);\n\n\tvec4 dtex = texture2D(diffuse, uv);\n\n\t// DIFFUSE\n\n\tvec3 normTex = texture2D(normal, uv).rgb;\n\tfloat diff = max(dot(normTex, opDir), 0.0);\n\tvec3 diffuseIntensity = (intensity * diff).rgb * dtex.rgb;\n\n\t// SPECULAR\n\n\tvec3 viewDir = normalize(vec3(camPos) - fragPos);\n\tvec3 reflectDir = reflect(vec3(direction), normTex);\n\tvec4 specTex = texture2D(specular, uv);\n\tfloat spec = pow(max(dot(viewDir, reflectDir), 0.0), 2.0 / max(specTex.a * specTex.a, 0.01));\n\tvec3 specularIntensity = (intensity.rgb * spec) * specTex.rgb;\n\n\tgl_FragData[0] = vec4((diffuseIntensity + specularIntensity) * power, dtex.a);\n}\n";
-
-	// Renders particles
-	var particleVS = "\nattribute vec3 vpos;\n\nuniform mat4 cam;\nuniform mat4 persp;\n\nuniform vec4 pos;\nuniform vec2 scale;\n\nvarying vec2 uv;\nvarying vec3 newPos;\n\nvoid main(void)\n{\n\tuv = vec2((vpos + vec3(1.0)) / 2.0);\n\n\tvec3 vertPos = vec3((vpos.xy * scale.xy) * 0.1, vpos.z);\n\n\tnewPos = pos.xyz;\n\n\tvec3 tempPos = vec3(cam * pos);\n\ttempPos += vertPos;\n\n\tvec4 finalPos = persp * vec4(tempPos, 1.0);\n\n\tgl_Position = finalPos;\n}\n";
-
-	// Also renders particles
-	var particleFS = "\nprecision mediump float;\n\nuniform sampler2D texture;\nuniform sampler2D oldPos;\n\nuniform vec3 camPos;\nuniform vec2 screenSize;\n\nvarying vec2 uv;\nvarying vec3 newPos;\n\n// Get the length-squared, as it is faster\nfloat lsq(vec3 vector)\n{\n\treturn (vector.x * vector.x + vector.y * vector.y + vector.z * vector.z);\n}\n\nvoid main(void)\n{\n\tvec2 screenUV = gl_FragCoord.xy / screenSize;\n\n\tvec4 tex = texture2D(texture, uv);\n\tvec3 posTex = texture2D(oldPos, screenUV).xyz;\n\n\tfloat oldDist = lsq(posTex - camPos);\n\tfloat newDist = lsq(newPos - camPos);\n\n\tif (newDist > oldDist) { discard; }\n\n\tgl_FragData[0] = tex;\n}\n";
-
-	// Fuses the opaque and transparent framebuffers
-	var fusionFS = "\nprecision mediump float;\n\nuniform sampler2D opaque;\nuniform sampler2D transparent;\nuniform sampler2D diffuse;\nuniform sampler2D particle;\n\nuniform vec3 skyColor;\n\nvarying vec2 uv;\n\nvoid main(void)\n{\n\tvec4 opaqueTex = texture2D(opaque, uv);\n\tvec4 transparentTex = texture2D(transparent, uv);\n\tvec4 diffuseTex = texture2D(diffuse, uv);\n\tvec4 partTex = texture2D(particle, uv);\n\n\tfloat oa = opaqueTex.a;\n\toa = clamp(oa, 0.0, 1.0);\n\tfloat alpha = diffuseTex.a;\n\tfloat pa = partTex.a;\n\n\t// Who needs built-in blending when you have the power of poor shader design\n\tvec4 result = opaqueTex * oa + vec4(skyColor * (1.0 - oa), 1.0);\n\tresult = vec4(vec3(transparentTex) * alpha + vec3(result) * (1.0 - alpha), 1.0);\n\tgl_FragData[0] = vec4(vec3(partTex) * pa + vec3(result) * (1.0 - pa), 1.0);\n}\n";
-
-	// TODO : Implement
-	var hdrFS = "\nprecision mediump float;\n\nuniform sampler2D tex;\n\nvarying vec2 uv;\n\nvoid main(void)\n{\n\tgl_FragColor = texture2D(tex, uv);\n}\n";
-
-	return {
-		vertexShader: vertexShader,
-		preMaterial: preMaterial,
-		postMaterial: postMaterial,
-		defaultMaterial: defaultMaterial,
-
-		lightVertex: lightVertex,
-		lightPrepass: lightPrepass,
-		lightAmbient: lightAmbient,
-		lightDirectional: lightDirectional,
-		lightPoint: lightPoint,
-
-		particleVS: particleVS,
-		particleFS: particleFS,
-
-		fusionFS: fusionFS,
-		hdrFS: hdrFS
-	};
-}();
-"use strict";
-
 /* eslint-env browser */
 /* globals createjs */
 
@@ -107,118 +46,6 @@ app.AudioPlayer = function (id) {
 };
 
 app.audio = { loadSound: loadSound };
-"use strict";
-
-/* eslint-env browser */
-// All of these functions are in the global scope
-
-// returns mouse position in local coordinate system of element
-window.getMouse = function (e) {
-  var mouse = {}; // make an object
-  mouse.x = e.pageX - e.target.offsetLeft;
-  mouse.y = e.pageY - e.target.offsetTop;
-  return mouse;
-};
-
-window.getRandom = function (min, max) {
-  return Math.random() * (max - min) + min;
-};
-
-window.nextInt = function (i) {
-  return Math.floor(Math.random() * i);
-};
-
-window.makeColor = function (red, green, blue, alpha) {
-  return "rgba(" + red + "," + green + "," + blue + ", " + alpha + ")";
-};
-
-// Function Name: getRandomColor()
-// returns a random color of alpha 1.0
-// http://paulirish.com/2009/random-hex-color-code-snippets/
-window.getRandomColor = function () {
-  var red = Math.round(Math.random() * 200 + 55);
-  var green = Math.round(Math.random() * 200 + 55);
-  var blue = Math.round(Math.random() * 200 + 55);
-  var color = "rgb(" + red + "," + green + "," + blue + ")";
-  // OR	if you want to change alpha
-  // var color='rgba('+red+','+green+','+blue+',0.50)'; // 0.50
-  return color;
-};
-
-window.getRandomUnitVector = function () {
-  var x = window.getRandom(-1, 1);
-  var y = window.getRandom(-1, 1);
-  var length = Math.sqrt(x * x + y * y);
-  if (length === 0) {
-    // very unlikely
-    x = 1; // point right
-    y = 0;
-    length = 1;
-  } else {
-    x /= length;
-    y /= length;
-  }
-
-  return { x: x, y: y };
-};
-
-window.simplePreload = function (imageArray) {
-  // loads images all at once
-  for (var i = 0; i < imageArray.length; i++) {
-    var img = new Image();
-    img.src = imageArray[i];
-  }
-};
-
-window.loadImagesWithCallback = function (sources, callback) {
-  var imageObjects = [];
-  var numImages = sources.length;
-  var numLoadedImages = 0;
-  var func = function func() {
-    numLoadedImages++;
-    // console.log("loaded image at '" + this.src + "'")
-    if (numLoadedImages >= numImages) {
-      callback(imageObjects); // send the images back
-    }
-  };
-
-  for (var i = 0; i < numImages; i++) {
-    imageObjects[i] = new Image();
-    imageObjects[i].onload = func;
-    imageObjects[i].src = sources[i];
-  }
-};
-
-/*
-Function Name: clamp(val, min, max)
-Author: Web - various sources
-Return Value: the constrained value
-Description: returns a value that is
-constrained between min and max (inclusive)
-*/
-window.clamp = function (val, min, max) {
-  return Math.max(min, Math.min(max, val));
-};
-
-// FULL SCREEN MODE
-window.requestFullscreen = function (element) {
-  if (element.requestFullscreen) {
-    element.requestFullscreen();
-  } else if (element.mozRequestFullscreen) {
-    element.mozRequestFullscreen();
-  } else if (element.mozRequestFullScreen) {
-    // camel-cased 'S' was changed to 's' in spec
-    element.mozRequestFullScreen();
-  } else if (element.webkitRequestFullscreen) {
-    element.webkitRequestFullscreen();
-  }
-  // .. and do nothing if the method is not supported
-};
-
-// Thanks Cody-sempai!
-window.lerp = function (v0, v1, alpha) {
-  return (1 - alpha) * v0 + alpha * v1;
-};
 'use strict';
 
 var app = window.app || {};
@@ -826,6 +653,9 @@ app.graphics = function () {
   // Called to draw a mesh renderable
   // ONLY TO BE CALLED BY draw
   function drawMesh(renderable) {
+    if (!renderable) {
+      return;
+    }
     gl.bindBuffer(gl.ARRAY_BUFFER, meshes[renderable.mesh].buffer);
     var v = meshes[renderable.mesh].count;
     var shader = shaders[renderable.material.shader];
@@ -2137,7 +1967,6 @@ window.onload = function () {
 };
 'use strict';
 
-/* globals io */ // Socket.io
 /* globals $V $L Vector */ // Sylvester
 /* globals DirectionalLight PointLight */ // Rendering Engine Lights
 /* globals  MeshRenderable ParticleRenderable */ // Rendering Engine Renderables
@@ -2182,7 +2011,6 @@ app.main = app.main || {
   musicPaused: false,
   musicPlayer: null,
 
-  genWorker: undefined,
   genMessage: '',
   genStr: '          ',
   genPercent: 0.0.toFixed(2),
@@ -2196,9 +2024,6 @@ app.main = app.main || {
 
   sunRender: null,
   moonRender: null,
-
-  entityList: {},
-  user: null,
 
   updateRequired: false,
 
@@ -2254,19 +2079,19 @@ app.main = app.main || {
     });
     this.moonRender.register();
 
-    window.onresize = function () {
-      this.GAME.WIDTH = window.innerWidth - 20;
-      this.GAME.HEIGHT = window.innerHeight - 20;
-      this.graphics.resize(this.GAME.WIDTH, this.GAME.HEIGHT);
-    }.bind(this);
+    window.onresize = this.onResize.bind(this);
 
     this.gameState = this.GAME_STATE.LOADING;
 
-    this.genWorker = io.connect();
-    this.genWorker.on('connect', this.handleConnection.bind(this));
+    app.network.startConnection();
 
     // Start the game loop
     this.update();
+  },
+  onResize: function onResize() {
+    this.GAME.WIDTH = window.innerWidth - 20;
+    this.GAME.HEIGHT = window.innerHeight - 20;
+    this.graphics.resize(this.GAME.WIDTH, this.GAME.HEIGHT);
   },
   update: function update() {
     this.animationID = requestAnimationFrame(this.update.bind(this));
@@ -2299,6 +2124,7 @@ app.main = app.main || {
     } else if (this.gameState === this.GAME_STATE.DEFAULT) {
       if (this.handleKeyPress) {
         this.keyCheck();
+        app.network.updateEntity();
       }
 
       this.graphics.draw(dt);
@@ -2330,8 +2156,9 @@ app.main = app.main || {
       this.graphics.drawText('x : ' + pos[0].toFixed(1), 8, 20, '10pt "Ubuntu Mono"', '#A0A0A0');
       this.graphics.drawText('y : ' + pos[1].toFixed(1), 8, 32, '10pt "Ubuntu Mono"', '#A0A0A0');
       this.graphics.drawText('z : ' + pos[2].toFixed(1), 8, 44, '10pt "Ubuntu Mono"', '#A0A0A0');
-      if (this.user) {
-        this.graphics.drawText('g : ' + this.user.onGround, 8, 56, '10pt "Ubuntu Mono"', '#A0A0A0');
+      var user = app.network.user();
+      if (user) {
+        this.graphics.drawText('g : ' + user.onGround, 8, 56, '10pt "Ubuntu Mono"', '#A0A0A0');
       }
       // Draw rtime in top right corner
       this.graphics.drawText(this.readableTime(), this.GAME.WIDTH - 60, 20, '10pt "Ubuntu Mono"', '#A0A0A0');
@@ -2344,10 +2171,14 @@ app.main = app.main || {
     this.handleSky();
   },
   keyCheck: function keyCheck() {
-    var yaw = this.user.rot.y;
+    var user = app.network.user();
+    if (!user) {
+      return;
+    }
+    var yaw = user.rot.y;
 
-    this.user.pos.updatePrev();
-    this.user.rot.updatePrev();
+    user.pos.updatePrev();
+    user.rot.updatePrev();
 
     if (this.myKeys.keydown[80]) {
       this.musicPaused = true;
@@ -2360,103 +2191,49 @@ app.main = app.main || {
 
     if (this.myKeys.keydown[87]) {
       // forward - w
-      this.user.pos.destX -= Math.sin(yaw) * 2;
-      this.user.pos.destZ -= Math.cos(yaw) * 2;
+      user.pos.destX -= Math.sin(yaw) * 2;
+      user.pos.destZ -= Math.cos(yaw) * 2;
     }
     if (this.myKeys.keydown[83]) {
       // back - s
-      this.user.pos.destX += Math.sin(yaw) * 2;
-      this.user.pos.destZ += Math.cos(yaw) * 2;
+      user.pos.destX += Math.sin(yaw) * 2;
+      user.pos.destZ += Math.cos(yaw) * 2;
     }
     if (this.myKeys.keydown[65]) {
       // left - a
-      this.user.pos.destX -= Math.cos(yaw) * 2;
-      this.user.pos.destZ += Math.sin(yaw) * 2;
+      user.pos.destX -= Math.cos(yaw) * 2;
+      user.pos.destZ += Math.sin(yaw) * 2;
     }
     if (this.myKeys.keydown[68]) {
       // right - d
-      this.user.pos.destX += Math.cos(yaw) * 2;
-      this.user.pos.destZ -= Math.sin(yaw) * 2;
+      user.pos.destX += Math.cos(yaw) * 2;
+      user.pos.destZ -= Math.sin(yaw) * 2;
     }
-    if (this.myKeys.keydown[32] && this.user.onGround) {
+    if (this.myKeys.keydown[32] && user.onGround) {
       // up - space
-      this.user.pos.destY += 50;
+      user.pos.destY += 25;
     }
 
     // Inverted up/down
     if (this.myKeys.keydown[38]) {
       // up
-      this.user.rot.destX -= 0.02; // look up
+      user.rot.destX -= 0.02; // look up
     }
     if (this.myKeys.keydown[40]) {
       // down
-      this.user.rot.destX += 0.02; // peer down
+      user.rot.destX += 0.02; // peer down
     }
     if (this.myKeys.keydown[37]) {
       // left
-      this.user.rot.destY += 0.02; // look left
+      user.rot.destY += 0.02; // look left
     }
     if (this.myKeys.keydown[39]) {
       // right
-      this.user.rot.destY -= 0.02; // peer right
+      user.rot.destY -= 0.02; // peer right
     }
-    this.user.rot.destX = window.clamp(this.user.rot.destX, -1.5, 1.5);
+    user.rot.destX = window.clamp(user.rot.destX, -1.5, 1.5);
 
-    this.user.alpha = 0;
-
-    // Entity update
-    var keys = Object.keys(this.entityList);
-    for (var i = 0; i < keys.length; i++) {
-      var entity = this.entityList[keys[i]];
-
-      if (!entity.pos) {
-        continue;
-      }
-
-      // Update alpha
-      if (entity.alpha < 1) {
-        entity.alpha += 0.05;
-      }
-
-      // Lerp position
-      entity.pos.lerp(entity.alpha);
-      entity.pos.y = Math.max(0, entity.pos.y);
-      entity.rot.lerp(entity.alpha);
-
-      var x = -Math.sin(entity.rot.destY - 0.4) * 1.5;
-      var z = -Math.cos(entity.rot.destY - 0.4) * 1.5;
-
-      var tx = -Math.sin(entity.rot.destY - 0.42) * 1.5;
-      var tz = -Math.cos(entity.rot.destY - 0.42) * 1.5;
-
-      entity.updateMesh();
-
-      entity.torchParticle.transform.position.elements[0] = x + entity.pos.x;
-      entity.torchParticle.transform.position.elements[1] = entity.pos.y - 0.3;
-      entity.torchParticle.transform.position.elements[2] = z + entity.pos.z;
-
-      entity.torch.transform.position.elements[0] = tx + entity.pos.x;
-      entity.torch.transform.position.elements[1] = entity.pos.y - 0.5;
-      entity.torch.transform.position.elements[2] = tz + entity.pos.z;
-
-      entity.torchLight.position = entity.torch.transform.position;
-
-      entity.torch.transform.rotation.elements[1] = entity.rot.destY;
-    }
-    this.user.mesh.transform.position.elements[1] += 2;
-    this.user.torchParticle.transform.position.elements[1] += 2;
-    this.user.torch.transform.position.elements[1] += 2;
-
-    // Emit update
-    this.genWorker.emit('movement', this.getSendingUser());
-  },
-  getSendingUser: function getSendingUser() {
-    return {
-      pos: this.user.pos,
-      rot: this.user.rot,
-      onGround: this.user.onGround,
-      lastUpdate: this.user.lastUpdate
-    };
+    user.alpha = 0;
   },
   calculateDeltaTime: function calculateDeltaTime() {
     var now = performance.now();
@@ -2557,8 +2334,34 @@ app.main = app.main || {
     var aMinute = Math.abs(tMinute);
     var aMin = (aMinute < 10 ? '0' : '') + aMinute;
     return (theHour < 0 || tMinute < 0 ? '-' : '') + absHour + ':' + aMin;
-  },
-  convertVector: function convertVector(input) {
+  }
+};
+'use strict';
+
+/* globals io */ // Socket.io
+/* globals MeshRenderable ParticleRenderable PointLight $V */ // Graphics
+
+var app = window.app || {};
+
+app.network = app.network || function func() {
+  // Global socket object
+  var genWorker = undefined;
+
+  var entityList = {};
+  var user = undefined;
+  var world = undefined;
+
+  var getSendingUser = function getSendingUser() {
+    var e = {
+      pos: user.pos,
+      rot: user.rot,
+      onGround: user.onGround,
+      lastUpdate: user.lastUpdate
+    };
+    return e;
+  };
+
+  var convertVector = function convertVector(input) {
     var ref = input;
     ref.updatePrev = function () {
       ref.prevX = ref.x;
@@ -2571,93 +2374,177 @@ app.main = app.main || {
       ref.z = window.lerp(ref.prevZ, ref.destZ, alpha);
     };
     return ref;
-  },
-  handleConnection: function handleConnection() {
-    var _this = this;
+  };
 
-    this.genWorker.on('genMsg', function (data) {
-      if (_this.gameState !== _this.GAME_STATE.LOADING) {
-        _this.updateRequired = true;
+  var createFakeVector = function createFakeVector(x, y, z) {
+    var e = {
+      x: x,
+      y: y,
+      z: z,
+      prevX: x,
+      prevY: y,
+      prevZ: z,
+      destX: x,
+      destY: y,
+      destZ: z
+    };
+    return e;
+  };
+
+  var updateEntity = function updateEntity() {
+    if (!world) {
+      return;
+    }
+    // Player position correction
+    var prev = convertVector(createFakeVector(user.pos.x, user.pos.y, user.pos.z));
+
+    // Entity update
+    var keys = Object.keys(entityList);
+    for (var i = 0; i < keys.length; i++) {
+      var entity = entityList[keys[i]];
+
+      if (!entity.pos) {
+        continue;
+      }
+
+      // Update alpha
+      if (entity.alpha < 1) {
+        entity.alpha += 0.05;
+      }
+
+      // Lerp position
+      entity.pos.lerp(entity.alpha);
+      entity.pos.y = Math.max(0, entity.pos.y);
+      entity.rot.lerp(entity.alpha);
+
+      if (entity === user) {
+        var pos = app.worldDefs.correctPosition(world, user.pos, prev);
+        user.onGround = pos.y === user.pos.y || pos.y <= 0;
+        user.pos = pos;
+      }
+
+      entity.updateMesh();
+
+      var x = -Math.sin(entity.rot.destY - 0.4) * 1.5;
+      var z = -Math.cos(entity.rot.destY - 0.4) * 1.5;
+
+      var tx = -Math.sin(entity.rot.destY - 0.42) * 1.5;
+      var tz = -Math.cos(entity.rot.destY - 0.42) * 1.5;
+
+      entity.torchParticle.transform.position.elements[0] = x + entity.pos.x;
+      entity.torchParticle.transform.position.elements[1] = entity.pos.y - 0.3;
+      entity.torchParticle.transform.position.elements[2] = z + entity.pos.z;
+
+      entity.torch.transform.position.elements[0] = tx + entity.pos.x;
+      entity.torch.transform.position.elements[1] = entity.pos.y - 0.5;
+      entity.torch.transform.position.elements[2] = tz + entity.pos.z;
+
+      entity.torchLight.position = entity.torch.transform.position;
+
+      entity.torch.transform.rotation.elements[1] = entity.rot.destY;
+    }
+
+    user.mesh.transform.position.elements[1] += 2;
+    user.torchParticle.transform.position.elements[1] += 2;
+    user.torch.transform.position.elements[1] += 2;
+
+    // Emit update
+    genWorker.emit('movement', getSendingUser());
+  };
+
+  var onMessage = function onMessage(socket) {
+    return socket.on('genMsg', function (data) {
+      if (app.main.gameState !== app.main.GAME_STATE.LOADING) {
+        app.main.updateRequired = true;
         return;
       }
-      _this.genMessage = data.genMessage;
-      _this.genStr = data.genStr;
-      _this.genPercent = data.genPercent;
+      app.main.genMessage = data.genMessage;
+      app.main.genStr = data.genStr;
+      app.main.genPercent = data.genPercent;
     });
+  };
 
-    this.genWorker.on('meshData', function (data) {
-      if (_this.gameState !== _this.GAME_STATE.LOADING) {
+  var onMeshData = function onMeshData(socket) {
+    return socket.on('meshData', function (data) {
+      if (app.main.gameState !== app.main.GAME_STATE.LOADING) {
         return;
       }
       var meshData = data.meshData;
 
       for (var i = 0; i < meshData.str.length; i++) {
         var tex = 'chunk' + meshData.chunkIndex + '-' + i;
-        _this.graphics.createMesh(meshData.str[i], tex);
+        app.main.graphics.createMesh(meshData.str[i], tex);
         var mesh = new MeshRenderable({
-          textures: _this.standardTextures,
+          textures: app.main.standardTextures,
           mesh: tex,
           posOnly: true,
           opaque: i !== 0,
           position: $V([meshData.chunkX, 0, meshData.chunkZ])
         });
         mesh.register();
-        _this.chunkMeshData.push(mesh);
+        app.main.chunkMeshData.push(mesh);
       }
 
       if (data.finished) {
-        _this.gameState = _this.GAME_STATE.BEGIN;
+        app.main.gameState = app.main.GAME_STATE.BEGIN;
       }
     });
+  };
 
-    this.genWorker.on('timeUpdate', function (data) {
-      _this.worldTime = data.time;
+  var timeUpdate = function timeUpdate(socket) {
+    return socket.on('timeUpdate', function (data) {
+      app.main.worldTime = data.time;
     });
+  };
 
-    this.genWorker.on('update', function (data) {
-      var entity = _this.entityList[data.id];
+  var createEntity = function createEntity(data) {
+    var entity = entityList[data.id] = data;
+    entity.pos = convertVector(data.pos);
+    entity.rot = convertVector(data.rot);
+
+    if (data.selfUser) {
+      entity.mesh = app.main.graphics.getActiveCamera();
+      user = entity;
+    } else {
+      entity.mesh = new MeshRenderable({
+        mesh: 'assets/meshes/cube.obj',
+        position: $V([data.pos.x, data.pos.y, data.pos.z])
+      });
+      entity.mesh.register();
+    }
+
+    entity.updateMesh = function () {
+      entity.mesh.transform.position.elements[0] = entity.pos.x;
+      entity.mesh.transform.position.elements[1] = entity.pos.y;
+      entity.mesh.transform.position.elements[2] = entity.pos.z;
+      entity.mesh.transform.rotation.elements[0] = entity.rot.x;
+      entity.mesh.transform.rotation.elements[1] = entity.rot.y;
+      entity.mesh.transform.rotation.elements[2] = entity.rot.z;
+    };
+
+    entity.torchParticle = new ParticleRenderable({});
+    entity.torchParticle.register();
+
+    entity.torch = new MeshRenderable({
+      scale: $V([0.05, 0.4, 0.05]),
+      rotation: $V([-0.2, 0.0, 0.2]),
+      textures: {
+        diffuseTexture: 'assets/textures/torchDiffuse.png',
+        emissionTexture: 'assets/textures/torchEmission.png'
+      }
+    });
+    entity.torch.register();
+
+    entity.torchLight = new PointLight({ intensity: $V([0.6, 0.5, 0.3]), radius: 20.0 });
+    entity.torchLight.register();
+  };
+
+  var update = function update(socket) {
+    return socket.on('update', function (data) {
+      var entity = entityList[data.id];
 
       if (!entity) {
-        entity = _this.entityList[data.id] = data;
-        entity.pos = _this.convertVector(data.pos);
-        entity.rot = _this.convertVector(data.rot);
-
-        if (data.selfUser) {
-          entity.mesh = _this.graphics.getActiveCamera();
-          _this.user = entity;
-        } else {
-          entity.mesh = new MeshRenderable({
-            mesh: 'assets/meshes/cube.obj',
-            position: $V([data.pos.x, data.pos.y, data.pos.z])
-          });
-          entity.mesh.register();
-        }
-
-        entity.updateMesh = function () {
-          entity.mesh.transform.position.elements[0] = entity.pos.x;
-          entity.mesh.transform.position.elements[1] = entity.pos.y;
-          entity.mesh.transform.position.elements[2] = entity.pos.z;
-          entity.mesh.transform.rotation.elements[0] = entity.rot.x;
-          entity.mesh.transform.rotation.elements[1] = entity.rot.y;
-          entity.mesh.transform.rotation.elements[2] = entity.rot.z;
-        };
-
-        entity.torchParticle = new ParticleRenderable({});
-        entity.torchParticle.register();
-
-        entity.torch = new MeshRenderable({
-          scale: $V([0.05, 0.4, 0.05]),
-          rotation: $V([-0.2, 0.0, 0.2]),
-          textures: {
-            diffuseTexture: 'assets/textures/torchDiffuse.png',
-            emissionTexture: 'assets/textures/torchEmission.png'
-          }
-        });
-        entity.torch.register();
-
-        entity.torchLight = new PointLight({ intensity: $V([0.6, 0.5, 0.3]), radius: 20.0 });
-        entity.torchLight.register();
-
+        createEntity(data);
         return;
       }
 
@@ -2666,21 +2553,561 @@ app.main = app.main || {
       }
 
       entity.lastUpdate = data.lastUpdate;
-      entity.pos = _this.convertVector(data.pos);
-      entity.rot = _this.convertVector(data.rot);
+      entity.pos = convertVector(data.pos);
+      entity.rot = convertVector(data.rot);
       entity.onGround = data.onGround;
       entity.alpha = 0;
     });
+  };
 
-    this.genWorker.on('kill', function (data) {
-      _this.entityList[data.id].mesh.unregister();
-      _this.entityList[data.id].torch.unregister();
-      _this.entityList[data.id].torchParticle.unregister();
-      _this.entityList[data.id].torchLight.unregister();
-      _this.graphics.unregisterRenderable(_this.entityList[data.id].mesh);
-      _this.entityList[data.id] = {};
+  var kill = function kill(socket) {
+    return socket.on('kill', function (data) {
+      entityList[data.id].mesh.unregister();
+      entityList[data.id].torch.unregister();
+      entityList[data.id].torchParticle.unregister();
+      entityList[data.id].torchLight.unregister();
+      app.main.graphics.unregisterRenderable(entityList[data.id].mesh);
+      entityList[data.id] = {};
     });
+  };
 
-    this.genWorker.emit('join', { name: 'Player' + Math.floor(Math.random() * 100) });
+  var handleWorld = function handleWorld(socket) {
+    return socket.on('worldData', function (data) {
+      world = app.worldDefs.makeWorld();
+      world.read(data);
+    });
+  };
+
+  var handleConnection = function handleConnection(socket) {
+    return socket.on('connect', function () {
+      onMessage(socket);
+      onMeshData(socket);
+      timeUpdate(socket);
+      update(socket);
+      kill(socket);
+      handleWorld(socket);
+      socket.emit('join', { name: 'Player' + Math.floor(Math.random() * 100) });
+    });
+  };
+
+  var startConnection = function startConnection() {
+    genWorker = io.connect();
+    handleConnection(genWorker);
+  };
+
+  var getUser = function getUser() {
+    return user;
+  };
+
+  return {
+    user: getUser,
+    updateEntity: updateEntity,
+    startConnection: startConnection
+  };
+}();
+"use strict";
+
+var app = app || {};
+
+app.shaders = function () {
+	// Manipulates the vertices and sets up for the material shader
+	var vertexShader = "\nattribute vec3 vpos;\nattribute vec2 vtex;\nattribute vec3 vnor;\n\nuniform mat4 world;\nuniform mat4 persp;\n\nvarying vec3 pos;\nvarying vec2 uv;\nvarying vec3 norm;\n\nvoid main(void)\n{\n\tpos = vec3(world * vec4(vpos, 1.0));\n\tuv = vtex;\n\tnorm = normalize(vec3(world * vec4(vnor, 0.0)));\n\n\tgl_Position = persp * world * vec4(vpos, 1.0);\n}\n";
+
+	// Sets the shader up for the material calculation
+	var preMaterial = "\n#extension GL_EXT_draw_buffers : require\nprecision mediump float;\n\nvarying vec3 pos;\nvarying vec2 uv;\nvarying vec3 norm;\n\nvec3 diffuse = vec3(0.5);\nvec3 normal = vec3(0.0, 0.0, 1.0);\nvec3 specular = vec3(0.5);\nvec3 emission = vec3(0.0);\nfloat roughness = 0.5;\nfloat opacity = 1.0;\n";
+
+	// Interprets the results of the material
+	var postMaterial = "\nuniform vec4 camPos;\n\n// float fogStart = 64.0;\n// float fogEnd = 80.0;\n\nvoid main(void)\n{\n\tmaterial();\n\n\n\t// float dist = length(vec3(camPos) - pos);\n\t// float fog = (dist - fogStart) / (fogEnd - fogStart);\n\t// fog = clamp(fog, 0.0, 1.0);\n\n\n\tgl_FragData[0] = vec4(diffuse, opacity);\n\n\tgl_FragData[1] = vec4(norm, 0.0);\n\n\tgl_FragData[2] = vec4(specular, roughness);\n\n\tgl_FragData[3] = vec4(emission, 1.0);\n\n\tgl_FragData[4] = vec4(pos, 1.0);\n}\n";
+
+	// Creates the material function which serves as the "meat" of the material
+	var defaultMaterial = "\nuniform sampler2D diffuseTexture;\nuniform sampler2D specularTexture;\nuniform sampler2D emissionTexture;\n\nvoid material(void)\n{\n\tvec4 dTex = texture2D(diffuseTexture, uv);\n\tvec4 sTex = texture2D(specularTexture, uv);\n\tvec4 eTex = texture2D(emissionTexture, uv);\n\n\n\tdiffuse = dTex.rgb;\n\topacity = dTex.a;\n\tspecular = sTex.rgb;\n\troughness = sTex.a;\n\temission = eTex.rgb;\n}\n";
+
+	// Simple vertex shader for lights
+	var lightVertex = "\nattribute vec3 vpos;\n\nvarying vec2 uv;\n\nvoid main(void)\n{\n\tuv = vec2((vpos + vec3(1.0)) / 2.0);\n\tgl_Position = vec4(vpos, 1.0);\n}\n";
+
+	// Sets the emission value
+	var lightPrepass = "\nprecision mediump float;\n\nuniform sampler2D emission;\n\nvarying vec2 uv;\n\nvoid main(void)\n{\n\tgl_FragData[0] = texture2D(emission, uv);\n}\n";
+
+	// Ambient light pass
+	var lightAmbient = "\nprecision mediump float;\n\nuniform sampler2D diffuse;\n\nuniform vec4 intensity;\n\nvarying vec2 uv;\n\nvoid main(void)\n{\n\tvec4 dtex = texture2D(diffuse, uv);\n\tgl_FragData[0] = vec4(intensity.rgb * dtex.rgb, dtex.a);\n}\n";
+
+	var lightDirectional = "\nprecision mediump float;\n\nuniform sampler2D diffuse;\nuniform sampler2D normal;\nuniform sampler2D specular;\nuniform sampler2D position;\n\nuniform vec4 direction;\nuniform vec4 intensity;\nuniform vec4 camPos;\n\nvarying vec2 uv;\n\nvoid main(void)\n{\n\tvec3 opDir = -vec3(direction);\n\n\tvec4 dtex = texture2D(diffuse, uv);\n\n\t// DIFFUSE\n\n\tvec3 normTex = texture2D(normal, uv).rgb;\n\tfloat diff = max(dot(normTex, opDir), 0.0);\n\tvec3 diffuseIntensity = (intensity * diff).rgb * dtex.rgb;\n\n\t// SPECULAR\n\n\tvec3 fragPos = texture2D(position, uv).rgb;\n\tvec3 viewDir = normalize(vec3(camPos) - fragPos);\n\tvec3 reflectDir = reflect(vec3(direction), normTex);\n\tvec4 specTex = texture2D(specular, uv);\n\tfloat spec = pow(max(dot(viewDir, reflectDir), 0.0), 2.0 / max(specTex.a * specTex.a, 0.01));\n\tvec3 specularIntensity = (intensity.rgb * spec) * specTex.rgb;\n\n\tgl_FragData[0] = vec4(diffuseIntensity + specularIntensity, dtex.a);\n}\n";
+
+	var lightPoint = "\nprecision mediump float;\n\nuniform sampler2D diffuse;\nuniform sampler2D normal;\nuniform sampler2D specular;\nuniform sampler2D position;\n\nuniform vec4 lightPos;\nuniform vec4 intensity;\nuniform vec4 camPos;\nuniform float radius;\n\nvarying vec2 uv;\n\nvoid main(void)\n{\n\tvec3 fragPos = texture2D(position, uv).rgb;\n\n\tfloat dist = length(fragPos - vec3(lightPos));\n\tfloat power = max(1.0 - (dist / radius), 0.0);\n\n\tvec3 direction = normalize(fragPos - vec3(lightPos));\n\tvec3 opDir = -vec3(direction);\n\n\tvec4 dtex = texture2D(diffuse, uv);\n\n\t// DIFFUSE\n\n\tvec3 normTex = texture2D(normal, uv).rgb;\n\tfloat diff = max(dot(normTex, opDir), 0.0);\n\tvec3 diffuseIntensity = (intensity * diff).rgb * dtex.rgb;\n\n\t// SPECULAR\n\n\tvec3 viewDir = normalize(vec3(camPos) - fragPos);\n\tvec3 reflectDir = reflect(vec3(direction), normTex);\n\tvec4 specTex = texture2D(specular, uv);\n\tfloat spec = pow(max(dot(viewDir, reflectDir), 0.0), 2.0 / max(specTex.a * specTex.a, 0.01));\n\tvec3 specularIntensity = (intensity.rgb * spec) * specTex.rgb;\n\n\tgl_FragData[0] = vec4((diffuseIntensity + specularIntensity) * power, dtex.a);\n}\n";
+
+	// Renders particles
+	var particleVS = "\nattribute vec3 vpos;\n\nuniform mat4 cam;\nuniform mat4 persp;\n\nuniform vec4 pos;\nuniform vec2 scale;\n\nvarying vec2 uv;\nvarying vec3 newPos;\n\nvoid main(void)\n{\n\tuv = vec2((vpos + vec3(1.0)) / 2.0);\n\n\tvec3 vertPos = vec3((vpos.xy * scale.xy) * 0.1, vpos.z);\n\n\tnewPos = pos.xyz;\n\n\tvec3 tempPos = vec3(cam * pos);\n\ttempPos += vertPos;\n\n\tvec4 finalPos = persp * vec4(tempPos, 1.0);\n\n\tgl_Position = finalPos;\n}\n";
+
+	// Also renders particles
+	var particleFS = "\nprecision mediump float;\n\nuniform sampler2D texture;\nuniform sampler2D oldPos;\n\nuniform vec3 camPos;\nuniform vec2 screenSize;\n\nvarying vec2 uv;\nvarying vec3 newPos;\n\n// Get the length-squared, as it is faster\nfloat lsq(vec3 vector)\n{\n\treturn (vector.x * vector.x + vector.y * vector.y + vector.z * vector.z);\n}\n\nvoid main(void)\n{\n\tvec2 screenUV = gl_FragCoord.xy / screenSize;\n\n\tvec4 tex = texture2D(texture, uv);\n\tvec3 posTex = texture2D(oldPos, screenUV).xyz;\n\n\tfloat oldDist = lsq(posTex - camPos);\n\tfloat newDist = lsq(newPos - camPos);\n\n\tif (newDist > oldDist) { discard; }\n\n\tgl_FragData[0] = tex;\n}\n";
+
+	// Fuses the opaque and transparent framebuffers
+	var fusionFS = "\nprecision mediump float;\n\nuniform sampler2D opaque;\nuniform sampler2D transparent;\nuniform sampler2D diffuse;\nuniform sampler2D particle;\n\nuniform vec3 skyColor;\n\nvarying vec2 uv;\n\nvoid main(void)\n{\n\tvec4 opaqueTex = texture2D(opaque, uv);\n\tvec4 transparentTex = texture2D(transparent, uv);\n\tvec4 diffuseTex = texture2D(diffuse, uv);\n\tvec4 partTex = texture2D(particle, uv);\n\n\tfloat oa = opaqueTex.a;\n\toa = clamp(oa, 0.0, 1.0);\n\tfloat alpha = diffuseTex.a;\n\tfloat pa = partTex.a;\n\n\t// Who needs built-in blending when you have the power of poor shader design\n\tvec4 result = opaqueTex * oa + vec4(skyColor * (1.0 - oa), 1.0);\n\tresult = vec4(vec3(transparentTex) * alpha + vec3(result) * (1.0 - alpha), 1.0);\n\tgl_FragData[0] = vec4(vec3(partTex) * pa + vec3(result) * (1.0 - pa), 1.0);\n}\n";
+
+	// TODO : Implement
+	var hdrFS = "\nprecision mediump float;\n\nuniform sampler2D tex;\n\nvarying vec2 uv;\n\nvoid main(void)\n{\n\tgl_FragColor = texture2D(tex, uv);\n}\n";
+
+	return {
+		vertexShader: vertexShader,
+		preMaterial: preMaterial,
+		postMaterial: postMaterial,
+		defaultMaterial: defaultMaterial,
+
+		lightVertex: lightVertex,
+		lightPrepass: lightPrepass,
+		lightAmbient: lightAmbient,
+		lightDirectional: lightDirectional,
+		lightPoint: lightPoint,
+
+		particleVS: particleVS,
+		particleFS: particleFS,
+
+		fusionFS: fusionFS,
+		hdrFS: hdrFS
+	};
+}();
+"use strict";
+
+/* eslint-env browser */
+// All of these functions are in the global scope
+
+// returns mouse position in local coordinate system of element
+window.getMouse = function (e) {
+  var mouse = {}; // make an object
+  mouse.x = e.pageX - e.target.offsetLeft;
+  mouse.y = e.pageY - e.target.offsetTop;
+  return mouse;
+};
+
+window.getRandom = function (min, max) {
+  return Math.random() * (max - min) + min;
+};
+
+window.nextInt = function (i) {
+  return Math.floor(Math.random() * i);
+};
+
+window.makeColor = function (red, green, blue, alpha) {
+  return "rgba(" + red + "," + green + "," + blue + ", " + alpha + ")";
+};
+
+// Function Name: getRandomColor()
+// returns a random color of alpha 1.0
+// http://paulirish.com/2009/random-hex-color-code-snippets/
+window.getRandomColor = function () {
+  var red = Math.round(Math.random() * 200 + 55);
+  var green = Math.round(Math.random() * 200 + 55);
+  var blue = Math.round(Math.random() * 200 + 55);
+  var color = "rgb(" + red + "," + green + "," + blue + ")";
+  // OR	if you want to change alpha
+  // var color='rgba('+red+','+green+','+blue+',0.50)'; // 0.50
+  return color;
+};
+
+window.getRandomUnitVector = function () {
+  var x = window.getRandom(-1, 1);
+  var y = window.getRandom(-1, 1);
+  var length = Math.sqrt(x * x + y * y);
+  if (length === 0) {
+    // very unlikely
+    x = 1; // point right
+    y = 0;
+    length = 1;
+  } else {
+    x /= length;
+    y /= length;
+  }
+
+  return { x: x, y: y };
+};
+
+window.simplePreload = function (imageArray) {
+  // loads images all at once
+  for (var i = 0; i < imageArray.length; i++) {
+    var img = new Image();
+    img.src = imageArray[i];
   }
 };
+
+window.loadImagesWithCallback = function (sources, callback) {
+  var imageObjects = [];
+  var numImages = sources.length;
+  var numLoadedImages = 0;
+  var func = function func() {
+    numLoadedImages++;
+    // console.log("loaded image at '" + this.src + "'")
+    if (numLoadedImages >= numImages) {
+      callback(imageObjects); // send the images back
+    }
+  };
+
+  for (var i = 0; i < numImages; i++) {
+    imageObjects[i] = new Image();
+    imageObjects[i].onload = func;
+    imageObjects[i].src = sources[i];
+  }
+};
+
+/*
+Function Name: clamp(val, min, max)
+Author: Web - various sources
+Return Value: the constrained value
+Description: returns a value that is
+constrained between min and max (inclusive)
+*/
+window.clamp = function (val, min, max) {
+  return Math.max(min, Math.min(max, val));
+};
+
+// FULL SCREEN MODE
+window.requestFullscreen = function (element) {
+  if (element.requestFullscreen) {
+    element.requestFullscreen();
+  } else if (element.mozRequestFullscreen) {
+    element.mozRequestFullscreen();
+  } else if (element.mozRequestFullScreen) {
+    // camel-cased 'S' was changed to 's' in spec
+    element.mozRequestFullScreen();
+  } else if (element.webkitRequestFullscreen) {
+    element.webkitRequestFullscreen();
+  }
+  // .. and do nothing if the method is not supported
+};
+
+// Thanks Cody-sempai!
+window.lerp = function (v0, v1, alpha) {
+  return (1 - alpha) * v0 + alpha * v1;
+};
+'use strict';
+
+/* globals window */ // If we're in the client....
+/*
+  World Generator API
+  Copyright Ashwin Ganapathiraju, 2011-2017
+  Exported to Javascript for: IGME-330 Project 2.
+  Under conversion to Node.js for: IGME-590 Project 2.
+  Contact for other usage at: axg3886@rit.edu
+*/
+
+var worldDefs = function worldDefs() {
+  /* Type Data */
+  var TYPES = Object.freeze({
+    air: 0,
+    stone: 1,
+    dirt: 2,
+    grass: 3,
+    wall: 4,
+    iron: 5,
+    gold: 6,
+    water: 7,
+    lava: 8,
+    stair: 9,
+    log: 10,
+    leaf: 11,
+    sand: 12
+  });
+
+  var makeTypeArray = function makeTypeArray(init) {
+    var a = [];
+    var keys = Object.keys(TYPES);
+    for (var i = 0; i < keys.length; i++) {
+      a[TYPES[keys[i]]] = init;
+    }
+    return a;
+  };
+
+  var TYPE_CUBE = makeTypeArray(true);
+  TYPE_CUBE[TYPES.air] = false;
+  TYPE_CUBE[TYPES.stair] = false;
+
+  var TYPE_OPAQUE = makeTypeArray(true);
+  TYPE_OPAQUE[TYPES.air] = false;
+  TYPE_OPAQUE[TYPES.water] = false;
+  TYPE_OPAQUE[TYPES.lava] = false;
+  TYPE_OPAQUE[TYPES.leaf] = false;
+
+  var TYPE_TEXTURES = makeTypeArray('');
+  TYPE_TEXTURES[TYPES.stair] = 'wood';
+
+  /* Numeric Data */
+
+  var CHUNK_SIZE = 16;
+  var CHUNK_HEIGHT = 128;
+  var NUM_CHUNKS = 6;
+  var WORLD_SIZE = NUM_CHUNKS * CHUNK_SIZE;
+  var SEA_LEVEL = 50;
+
+  /* Methods */
+
+  var makeArr = function makeArr() {
+    var N = CHUNK_SIZE; // Math.pow(2, p),
+    var arr = new Uint8ClampedArray(N * N);
+    var get = function get(x, z) {
+      return arr[x * N + z];
+    };
+    var set = function set(x, z, v) {
+      arr[x * N + z] = v;
+    };
+    var write = function write() {
+      return arr;
+    };
+    var read = function read(data) {
+      for (var x = 0; x < N; x++) {
+        for (var z = 0; z < N; z++) {
+          set(x, z, data[x * N + z]);
+        }
+      }
+    };
+    for (var x = 0; x < N; x++) {
+      for (var z = 0; z < N; z++) {
+        set(x, z, TYPES.stone);
+      }
+    }
+
+    return Object.seal({
+      get: get,
+      set: set,
+      write: write,
+      read: read
+    });
+  };
+
+  var makeChunk = function makeChunk(i, j) {
+    var chunk = [];
+    var heightMap = new Uint8ClampedArray(CHUNK_SIZE * CHUNK_SIZE);
+    var get = function get(x, y, z) {
+      if (chunk[y]) {
+        return chunk[y].get(x, z);
+      }return undefined;
+    };
+    var set = function set(x, y, z, v) {
+      chunk[y].set(x, z, v);
+    };
+    var globalX = function globalX(x) {
+      return (i << 4) + x;
+    };
+    var globalZ = function globalZ(z) {
+      return (j << 4) + z;
+    };
+    var height = function height(x, z) {
+      return heightMap[x * CHUNK_SIZE + z];
+    };
+    var setHeight = function setHeight(x, z, v) {
+      heightMap[x * CHUNK_SIZE + z] = v;
+    };
+    var recalcHeight = function recalcHeight() {
+      for (var n = 0; n < CHUNK_SIZE; n++) {
+        for (var m = 0; m < CHUNK_SIZE; m++) {
+          var s = false;
+          for (var o = CHUNK_HEIGHT - 1; !s && o > -1; o--) {
+            if (get(n, o, m) !== TYPES.air) {
+              setHeight(n, m, o);
+              s = true;
+            }
+          }
+        }
+      }
+    };
+    var write = function write() {
+      var obj = [];
+      for (var k = 0; k < CHUNK_HEIGHT; k++) {
+        obj[k] = chunk[k].write();
+      }
+      return obj;
+    };
+    var read = function read(obj) {
+      for (var k = 0; k < CHUNK_HEIGHT; k++) {
+        chunk[k].read(obj[k]);
+      }
+    };
+
+    for (var k = 0; k < CHUNK_HEIGHT; k++) {
+      chunk[k] = makeArr();
+    }
+
+    return Object.freeze({
+      get: get,
+      set: set,
+      globalX: globalX,
+      globalZ: globalZ,
+      chunkX: i,
+      chunkZ: j,
+      height: height,
+      setHeight: setHeight,
+      recalcHeight: recalcHeight,
+      write: write,
+      read: read
+    });
+  };
+
+  var makeWorld = function makeWorld() {
+    var world = [];
+    var indexed = function indexed(i) {
+      return world[i];
+    };
+
+    var getChunk = function getChunk(i, j) {
+      return indexed(i * NUM_CHUNKS + j);
+    };
+    var setChunk = function setChunk(i, j, v) {
+      world[i * NUM_CHUNKS + j] = v;
+    };
+
+    var chunk = function chunk(x, z, o) {
+      var c = getChunk(x >> 4, z >> 4);
+      return c ? o(c) : undefined;
+    };
+    var loop = function loop(func) {
+      for (var x = 0; x < NUM_CHUNKS; x++) {
+        for (var z = 0; z < NUM_CHUNKS; z++) {
+          func(x, z);
+        }
+      }
+    };
+
+    var get = function get(x, y, z) {
+      return chunk(x, z, function (c) {
+        return c.get(x % 16, y, z % 16);
+      });
+    };
+    var set = function set(x, y, z, v) {
+      chunk(x, z, function (c) {
+        return c.set(x % 16, y, z % 16, v);
+      });
+    };
+    var height = function height(x, z) {
+      return chunk(x, z, function (c) {
+        return c.height(x % 16, z % 16);
+      });
+    };
+    var recalcHeight = function recalcHeight() {
+      return loop(function (i, j) {
+        return getChunk(i, j).recalcHeight();
+      });
+    };
+
+    var write = function write() {
+      var obj = [];
+      loop(function (i, j) {
+        obj[i * NUM_CHUNKS + j] = getChunk(i, j).write();
+      });
+      return obj;
+    };
+    var read = function read(obj) {
+      loop(function (i, j) {
+        return getChunk(i, j).read(obj[i * NUM_CHUNKS + j]);
+      });
+    };
+
+    loop(function (i, j) {
+      return setChunk(i, j, makeChunk(i, j));
+    });
+
+    return Object.freeze({
+      get: get,
+      set: set,
+      getChunk: getChunk,
+      setChunk: setChunk,
+      height: height,
+      recalcHeight: recalcHeight,
+      length: world.length,
+      indexed: indexed,
+      write: write,
+      read: read
+    });
+  };
+
+  var posCheck = function posCheck(world, x, y, z) {
+    var floorX = Math.floor(x + 0.1); // Ew....
+    var floorY = Math.floor(y + 0.1); // have to do this...
+    var floorZ = Math.floor(z + 0.1); // Ugh.....
+    return world.get(floorX, floorY, floorZ) || TYPES.air;
+  };
+
+  var correctPosition = function correctPosition(world, orig, prev) {
+    var pos = orig;
+
+    var gravity = 0.4905;
+    if (posCheck(world, pos.x, pos.y, pos.z) === TYPES.water) {
+      gravity *= 0.5; // Fall slower in water
+    }
+    pos.destY -= gravity;
+
+    if (TYPE_OPAQUE[posCheck(world, pos.x - 0.25, pos.y, pos.z)]) {
+      if (TYPE_OPAQUE[posCheck(world, pos.x - 0.25, pos.y + 1, pos.z)]) {
+        pos.x = prev.x;
+        pos.destX = prev.destX;
+      } else {
+        pos.y += 0.5;
+        pos.destY += 0.5;
+      }
+    }
+    if (TYPE_OPAQUE[posCheck(world, pos.x + 0.25, pos.y, pos.z)]) {
+      if (TYPE_OPAQUE[posCheck(world, pos.x + 0.25, pos.y + 1, pos.z)]) {
+        pos.x = prev.x;
+        pos.destX = prev.destX;
+      } else {
+        pos.y += 0.5;
+        pos.destY += 0.5;
+      }
+    }
+    if (TYPE_OPAQUE[posCheck(world, pos.x, pos.y, pos.z - 0.25)]) {
+      if (TYPE_OPAQUE[posCheck(world, pos.x, pos.y + 1, pos.z - 0.25)]) {
+        pos.z = prev.z;
+        pos.destZ = prev.destZ;
+      } else {
+        pos.y += 0.25;
+        pos.destY += 0.25;
+      }
+    }
+    if (TYPE_OPAQUE[posCheck(world, pos.x, pos.y, pos.z + 0.25)]) {
+      if (TYPE_OPAQUE[posCheck(world, pos.x, pos.y + 1, pos.z + 0.25)]) {
+        pos.z = prev.z;
+        pos.destZ = prev.destZ;
+      } else {
+        pos.y += 0.5;
+        pos.destY += 0.5;
+      }
+    }
+
+    if (TYPE_OPAQUE[posCheck(world, pos.x, pos.y - 0.25, pos.z)]) {
+      pos.y = prev.y;
+      pos.destY = prev.destY;
+    }
+    if (TYPE_OPAQUE[posCheck(world, pos.x, pos.y + 0.25, pos.z)]) {
+      pos.y = prev.y;
+      pos.destY = prev.destY;
+    }
+
+    pos.x = Math.max(1, Math.min(WORLD_SIZE - 1, pos.x));
+    pos.y = Math.max(-2, Math.min(CHUNK_HEIGHT, pos.y));
+    pos.z = Math.max(1, Math.min(WORLD_SIZE - 1, pos.z));
+    pos.destX = Math.max(1, Math.min(WORLD_SIZE - 1, pos.destX));
+    pos.destY = Math.max(-2, Math.min(CHUNK_HEIGHT, pos.destY));
+    pos.destZ = Math.max(1, Math.min(WORLD_SIZE - 1, pos.destZ));
+
+    return pos;
+  };
+
+  return {
+    // Data
+    TYPES: TYPES,
+    TYPE_CUBE: TYPE_CUBE,
+    TYPE_OPAQUE: TYPE_OPAQUE,
+    TYPE_TEXTURES: TYPE_TEXTURES,
+    CHUNK_HEIGHT: CHUNK_HEIGHT,
+    CHUNK_SIZE: CHUNK_SIZE,
+    NUM_CHUNKS: NUM_CHUNKS,
+    WORLD_SIZE: WORLD_SIZE,
+    SEA_LEVEL: SEA_LEVEL,
+    // Methods
+    makeWorld: makeWorld,
+    correctPosition: correctPosition
+  };
+}();
+
+if (typeof module !== 'undefined' && module.exports) {
+  module.exports = worldDefs;
+} else if (typeof window !== 'undefined') {
+  window.app.worldDefs = worldDefs;
+}
