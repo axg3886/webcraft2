@@ -185,7 +185,7 @@ const disconnect = (io, socket) => socket.on('disconnect', () => {
 });
 
 // Handle entity movement
-const movement = (io, socket) => socket.on('movement', (data) => {
+const movement = (socket) => socket.on('movement', (data) => {
   const player = entityList[socket.playerId];
   if (!player) {
     return;
@@ -194,19 +194,11 @@ const movement = (io, socket) => socket.on('movement', (data) => {
   // Height check
   const pos = worldDefs.correctPosition(world, data.pos, player.pos);
 
-  const equality = player.pos.x === pos.x && player.pos.destX === pos.destX &&
-                   player.pos.y === pos.y && player.pos.destY === pos.destY &&
-                   player.pos.z === pos.z && player.pos.destZ === pos.destZ;
-
   player.onGround = pos.y === player.pos.y || pos.y <= 0;
   player.pos = pos;
   player.rot = data.rot;
   player.lastUpdate = new Date().getTime();
-  if (!equality) {
-    io.emit('update', player);
-  } else {
-    socket.broadcast.emit('update', player);
-  }
+  socket.broadcast.emit('update', player);
 });
 
 const startSocketServer = (io) => {
@@ -218,7 +210,7 @@ const startSocketServer = (io) => {
 
     newPlayer(socket);
     disconnect(io, socket);
-    movement(io, socket);
+    movement(socket);
   });
 
   genState = GEN_STATE.START;
